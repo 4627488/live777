@@ -1,7 +1,10 @@
+use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use tokio::net::TcpListener;
 use tokio::process::Command;
+
+use portpicker::pick_unused_port;
 
 mod common;
 use common::shutdown_signal;
@@ -13,13 +16,42 @@ struct Detect {
     video: Option<(u16, u16)>,
 }
 
+struct WhepPorts {
+    video: Option<u16>,
+    audio: Option<u16>,
+}
+
+fn pick_port_excluding(used: &mut HashSet<u16>) -> u16 {
+    loop {
+        let port = pick_unused_port().expect("failed to pick unused port");
+        if used.insert(port) {
+            return port;
+        }
+    }
+}
+
+fn build_whep_ports(used: &mut HashSet<u16>, has_video: bool, has_audio: bool) -> WhepPorts {
+    let video = if has_video {
+        Some(pick_port_excluding(used))
+    } else {
+        None
+    };
+    let audio = if has_audio {
+        Some(pick_port_excluding(used))
+    } else {
+        None
+    };
+    WhepPorts { video, audio }
+}
+
 #[tokio::test]
 async fn test_livetwo_rtp_vp8() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5000;
-    let whep_port: u16 = 5005;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, false);
 
     let width = 640;
     let height = 480;
@@ -31,7 +63,7 @@ async fn test_livetwo_rtp_vp8() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: None,
             video: Some((width, height)),
@@ -45,8 +77,9 @@ async fn test_livetwo_rtp_vp8_ipv6() {
     let ip = IpAddr::V6(Ipv6Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5010;
-    let whep_port: u16 = 5015;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, false);
 
     let width = 640;
     let height = 480;
@@ -58,7 +91,7 @@ async fn test_livetwo_rtp_vp8_ipv6() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: None,
             video: Some((width, height)),
@@ -72,8 +105,9 @@ async fn test_livetwo_rtp_vp9() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5020;
-    let whep_port: u16 = 5025;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, false);
 
     let width = 640;
     let height = 480;
@@ -85,7 +119,7 @@ async fn test_livetwo_rtp_vp9() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: None,
             video: Some((width, height)),
@@ -99,8 +133,9 @@ async fn test_livetwo_rtp_h264() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5030;
-    let whep_port: u16 = 5035;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, false);
 
     let width = 640;
     let height = 480;
@@ -114,7 +149,7 @@ async fn test_livetwo_rtp_h264() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: None,
             video: Some((width, height)),
@@ -157,10 +192,11 @@ async fn test_livetwo_rtp_opus() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5050;
-    let whep_port: u16 = 5055;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, false, true);
 
-    let codec = "-acodec libopus";
+    let codec = "-ac 2 -acodec libopus";
     let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
 
     helper_livetwo_rtp(
@@ -168,7 +204,7 @@ async fn test_livetwo_rtp_opus() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: Some(2),
             video: None,
@@ -182,8 +218,9 @@ async fn test_livetwo_rtp_g722() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5060;
-    let whep_port: u16 = 5065;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, false, true);
 
     let codec = "-acodec g722";
     let prefix = format!("ffmpeg -re -f lavfi -i sine=frequency=1000 {codec}");
@@ -193,7 +230,7 @@ async fn test_livetwo_rtp_g722() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: Some(1),
             video: None,
@@ -207,8 +244,9 @@ async fn test_livetwo_rtp_vp8_opus() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5070;
-    let whep_port: u16 = 5075;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, true);
 
     let width = 640;
     let height = 480;
@@ -222,7 +260,7 @@ async fn test_livetwo_rtp_vp8_opus() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: Some(2),
             video: Some((width, height)),
@@ -236,8 +274,9 @@ async fn test_livetwo_rtp_h264_g722() {
     let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
     let port = 0;
 
-    let whip_port: u16 = 5080;
-    let whep_port: u16 = 5085;
+    let mut used_ports = HashSet::new();
+    let whip_port = pick_port_excluding(&mut used_ports);
+    let whep_ports = build_whep_ports(&mut used_ports, true, true);
 
     let width = 640;
     let height = 480;
@@ -252,7 +291,7 @@ async fn test_livetwo_rtp_h264_g722() {
         port,
         &prefix,
         whip_port,
-        whep_port,
+        whep_ports,
         Detect {
             audio: Some(1),
             video: Some((width, height)),
@@ -266,7 +305,7 @@ async fn helper_livetwo_rtp(
     port: u16,
     prefix: &str,
     whip_port: u16,
-    whep_port: u16,
+    whep_ports: WhepPorts,
     detect: Detect,
 ) {
     let cfg = liveion::config::Config::default();
@@ -346,19 +385,23 @@ async fn helper_livetwo_rtp(
         _ => ip.to_string(),
     };
 
-    let target_url = if detect.audio.is_some() && detect.video.is_some() {
-        format!(
+    let WhepPorts { video, audio } = whep_ports;
+    let target_url = match (detect.video.is_some(), detect.audio.is_some()) {
+        (true, true) => format!(
             "rtp://{}?video={}&audio={}",
             ip_str,
-            whep_port,
-            whep_port + 2
-        )
-    } else if detect.video.is_some() {
-        format!("rtp://{ip_str}?video={whep_port}")
-    } else if detect.audio.is_some() {
-        format!("rtp://{ip_str}?audio={whep_port}")
-    } else {
-        format!("rtp://{ip_str}")
+            video.expect("video port required"),
+            audio.expect("audio port required"),
+        ),
+        (true, false) => format!(
+            "rtp://{ip_str}?video={}",
+            video.expect("video port required"),
+        ),
+        (false, true) => format!(
+            "rtp://{ip_str}?audio={}",
+            audio.expect("audio port required"),
+        ),
+        (false, false) => format!("rtp://{ip_str}"),
     };
 
     tokio::spawn(livetwo::whep::from(
