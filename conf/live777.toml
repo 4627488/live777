@@ -16,6 +16,20 @@ urls = [
 # Stream name patterns for auto-recording, supports wildcards
 auto_streams = ["*"] # Record all streams
 
+# Recording rotation settings
+# Rotate recordings daily at midnight (based on timezone offset)
+rotate_daily = true
+# Timezone offset in minutes from UTC (e.g., 480 for UTC+8)
+rotate_tz_offset_minutes = 0
+
+# Rotate recordings at specified interval (in seconds), 0 means disabled
+# This creates a new recording session with a new timestamp every N seconds
+# Useful for limiting individual recording file sizes and improving recovery from failures
+# Example: 3600 = rotate every hour, 86400 = rotate every day
+# Note: If both rotate_daily and rotate_interval_seconds are enabled,
+#       both rotations will occur independently
+rotate_interval_seconds = 0
+
 # Storage backend configuration
 [recorder.storage]
 # Local filesystem (default)

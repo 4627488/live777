@@ -10,13 +10,15 @@ use crate::recorder::segmenter::Segmenter;
 use crate::stream::manager::Manager;
 use anyhow::{Result, anyhow};
 use bytes::Bytes;
-use chrono::{Datelike, Utc};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use webrtc::api::media_engine::{MIME_TYPE_AV1, MIME_TYPE_H264, MIME_TYPE_HEVC, MIME_TYPE_VP9};
 
+use storage::RecordingId;
+
 pub struct RecordingTask {
     pub stream: String,
+    pub recording_id: RecordingId,
     handle: JoinHandle<()>,
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
@@ -49,24 +51,21 @@ impl RecordingTask {
             }
         };
 
-        // Directory prefix, allow override; default to /<stream>/<yyyy>/<MM>/<DD>
-        let path_prefix = if let Some(p) = path_prefix_override {
-            p
+        // Directory prefix, allow override; default to /<stream>/<timestamp>
+        let recording_id = if let Some(p) = path_prefix_override {
+            // Parse from provided path or create new with current timestamp
+            RecordingId::from_path(&p).unwrap_or_else(|| RecordingId::new(&stream_name))
         } else {
-            let now = Utc::now();
-            format!(
-                "{}/{:04}/{:02}/{:02}",
-                stream_name,
-                now.year(),
-                now.month(),
-                now.day()
-            )
+            RecordingId::new(&stream_name)
         };
+        
+        let path_prefix = recording_id.path_prefix();
 
         tracing::info!(
-            "[recorder] initializing recording for stream {} with path prefix: {}",
+            "[recorder] initializing recording for stream {} with path prefix: {} (recording_id: {})",
             stream_name,
-            path_prefix
+            path_prefix,
+            recording_id
         );
 
         // Initialize Segmenter
@@ -378,6 +377,7 @@ impl RecordingTask {
 
         Ok(Self {
             stream: stream_name,
+            recording_id,
             handle,
             shutdown_tx: Some(shutdown_tx),
         })
@@ -385,7 +385,12 @@ impl RecordingTask {
 
     pub async fn stop(mut self) {
         let stream = std::mem::take(&mut self.stream);
-        tracing::info!("[recorder] stopping recording for stream {}", stream);
+        let recording_id = self.recording_id.clone();
+        tracing::info!(
+            "[recorder] stopping recording for stream {} (recording_id: {})",
+            stream,
+            recording_id
+        );
 
         if let Some(tx) = self.shutdown_tx.take()
             && tx.send(()).is_err()

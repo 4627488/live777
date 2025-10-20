@@ -90,6 +90,15 @@ pub async fn init(manager: Arc<Manager>, cfg: RecorderConfig) {
         }
     });
 
+    // Start interval rotation loop if enabled
+    if cfg.rotate_interval_seconds > 0 {
+        let manager_for_rotate = manager.clone();
+        let cfg_for_rotate = cfg.clone();
+        tokio::spawn(async move {
+            rotate_interval_loop(manager_for_rotate, cfg_for_rotate).await;
+        });
+    }
+
     // Start daily rotation loop if enabled
     if cfg.rotate_daily {
         let manager_for_rotate = manager.clone();
@@ -155,6 +164,61 @@ pub async fn stop(stream: String) -> anyhow::Result<()> {
 }
 
 #[cfg(feature = "recorder")]
+async fn rotate_interval_loop(manager: Arc<Manager>, cfg: Arc<RecorderConfig>) {
+    let interval_seconds = cfg.rotate_interval_seconds;
+    
+    loop {
+        let sleep = tokio::time::sleep(std::time::Duration::from_secs(interval_seconds));
+        tokio::pin!(sleep);
+        let _ = sleep.as_mut().await;
+
+        // Perform rotation: stop all current recordings and start new ones with new timestamps
+        if let Err(e) = perform_interval_rotation(manager.clone(), cfg.clone()).await {
+            tracing::error!("[recorder] interval rotation failed: {}", e);
+        }
+    }
+}
+
+#[cfg(feature = "recorder")]
+async fn perform_interval_rotation(
+    manager: Arc<Manager>,
+    cfg: Arc<RecorderConfig>,
+) -> anyhow::Result<()> {
+    // Collect current recording streams
+    let streams: Vec<String> = {
+        let map = TASKS.read().await;
+        map.keys().cloned().collect()
+    };
+
+    if streams.is_empty() {
+        return Ok(());
+    }
+
+    tracing::info!(
+        "[recorder] performing interval rotation for {} streams (interval: {}s)",
+        streams.len(),
+        cfg.rotate_interval_seconds
+    );
+
+    // Stop all current recordings
+    for s in &streams {
+        let _ = stop(s.clone()).await;
+    }
+
+    // Start new recordings with new timestamps (RecordingId will generate new timestamp automatically)
+    for s in streams {
+        if !should_record(&cfg.auto_streams, &s) {
+            // If the stream was manually started and not in auto_streams, still restart to preserve behavior
+        }
+        if let Err(e) = start(manager.clone(), s.clone(), None).await {
+            tracing::error!("[recorder] failed to restart recording for {}: {}", s, e);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "recorder")]
 async fn rotate_daily_loop(manager: Arc<Manager>, cfg: Arc<RecorderConfig>) {
     // Prepare timezone offset
     let offset_minutes = cfg.rotate_tz_offset_minutes;
@@ -212,21 +276,14 @@ async fn perform_daily_rotation(
         let _ = stop(s.clone()).await;
     }
 
-    // Compute date path according to configured timezone
-    let offset_minutes = cfg.rotate_tz_offset_minutes;
-    let tz =
-        FixedOffset::east_opt(offset_minutes * 60).unwrap_or(FixedOffset::east_opt(0).unwrap());
-    let now_local = Utc::now().with_timezone(&tz);
-    let date_path = now_local.format("%Y/%m/%d").to_string();
-
-    // Start all again with tz-based date path: <stream>/<YYYY>/<MM>/<DD>
+    // Start all again with new RecordingId (timestamp will be current time)
+    // Note: Daily rotation now just creates a new recording session at midnight
+    // The RecordingId timestamp will be the actual rotation time
     for s in streams {
         if !should_record(&cfg.auto_streams, &s) {
             // If the stream was manually started and not in auto_streams, still restart to preserve behavior
-            // Fall through to restart
         }
-        let base_dir = Some(format!("{}/{}", s, date_path));
-        if let Err(e) = start(manager.clone(), s.clone(), base_dir).await {
+        if let Err(e) = start(manager.clone(), s.clone(), None).await {
             tracing::error!("[recorder] failed to restart recording for {}: {}", s, e);
         }
     }

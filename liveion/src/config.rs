@@ -140,6 +140,12 @@ pub struct RecorderConfig {
     /// Timezone offset in minutes from UTC for daily rotation scheduling (e.g., +480 for UTC+8)
     #[serde(default)]
     pub rotate_tz_offset_minutes: i32,
+
+    /// Rotate recordings at specified interval (in seconds), 0 means disabled
+    /// This creates a new recording session with a new timestamp every N seconds
+    /// Useful for limiting individual recording file sizes and improving recovery from failures
+    #[serde(default)]
+    pub rotate_interval_seconds: u64,
 }
 
 #[cfg(feature = "recorder")]
@@ -156,6 +162,7 @@ impl Default for RecorderConfig {
             node_alias: None,
             rotate_daily: default_rotate_daily(),
             rotate_tz_offset_minutes: 0,
+            rotate_interval_seconds: 0,
         }
     }
 }
