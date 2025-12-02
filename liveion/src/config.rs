@@ -4,6 +4,12 @@ use iceserver::{IceServer, default_ice_servers};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Clone, Deserialize, Serialize)]
+pub struct RtcConfig {
+    #[serde(default)]
+    pub disable_vp8: bool,
+}
+
+#[derive(Debug, Default, Clone, Deserialize, Serialize)]
 pub struct Config {
     #[serde(default)]
     pub http: Http,
@@ -15,6 +21,9 @@ pub struct Config {
     pub log: Log,
     #[serde(default)]
     pub strategy: api::strategy::Strategy,
+
+    #[serde(default)]
+    pub rtc: RtcConfig,
 
     #[cfg(feature = "net4mqtt")]
     #[serde(default)]

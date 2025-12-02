@@ -3,12 +3,15 @@ use crate::recorder::fmp4::{Fmp4Writer, Mp4Sample};
 use crate::recorder::pli_backoff::PliBackoff;
 use anyhow::Result;
 use bytes::Bytes;
+use chrono::Utc;
 use opendal::Operator;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 /// Default duration of each segment in seconds
 const DEFAULT_SEG_DURATION: u64 = 10;
 
+const INDEX_FILENAME: &str = "index.json";
 const MANIFEST_FILENAME: &str = "manifest.mpd";
 const VIDEO_INIT_FILENAME: &str = "v_init.m4s";
 const AUDIO_INIT_FILENAME: &str = "a_init.m4s";
@@ -25,6 +28,29 @@ const DEFAULT_AUDIO_CODEC: &str = "opus";
 const VIDEO_TRACK_ID: u32 = 1;
 const AUDIO_TRACK_ID: u32 = 2;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum RecordingStatus {
+    Recording,
+    Completed,
+    Uploading,
+    Uploaded,
+    Deleted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexJson {
+    pub ver: u32,
+    pub id: String,
+    pub stream: String,
+    pub start_time: i64, // ms
+    pub end_time: i64,   // ms
+    pub duration: u64,   // ms
+    pub status: RecordingStatus,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
+}
+
 /// Represents a completed segment with its actual duration
 #[derive(Debug, Clone)]
 struct SegmentInfo {
@@ -36,6 +62,7 @@ pub struct Segmenter {
     op: Operator,
     stream: String,
     path_prefix: String,
+    index_info: IndexJson,
     timescale: u32,
     // Length of each segment (in timescale units) for fast comparison
     seg_duration_ticks: u64,
@@ -108,10 +135,25 @@ pub struct Segmenter {
 
 impl Segmenter {
     pub async fn new(op: Operator, stream: String, root_prefix: String) -> Result<Self> {
-        Ok(Self {
+        let record_id = root_prefix.rsplit('/').next().unwrap_or("0").to_string();
+        let now = Utc::now().timestamp_millis();
+
+        let index_info = IndexJson {
+            ver: 1,
+            id: record_id,
+            stream: stream.clone(),
+            start_time: now,
+            end_time: now,
+            duration: 0,
+            status: RecordingStatus::Recording,
+            files: vec![MANIFEST_FILENAME.to_string()],
+        };
+
+        let mut segmenter = Self {
             op,
             stream: stream.clone(),
             path_prefix: root_prefix,
+            index_info,
             timescale: 90_000,
             seg_duration_ticks: 90_000u64 * DEFAULT_SEG_DURATION,
             video_seg_index: 0,
@@ -151,7 +193,12 @@ impl Segmenter {
             video_adapter: None,
             segments: Vec::new(),
             audio_segments: Vec::new(),
-        })
+        };
+
+        // Write initial index.json
+        segmenter.write_index_json().await?;
+
+        Ok(segmenter)
     }
 
     /// Feed one H.264 Frame (Annex-B format, may contain multiple NALUs)
@@ -393,6 +440,13 @@ impl Segmenter {
     pub async fn flush(&mut self) -> Result<()> {
         self.roll_segment().await?;
         self.roll_audio_segment(true).await?;
+
+        self.index_info.status = RecordingStatus::Completed;
+        let now = Utc::now().timestamp_millis();
+        self.index_info.end_time = now;
+        self.index_info.duration = (now - self.index_info.start_time).max(0) as u64;
+        self.write_index_json().await?;
+
         Ok(())
     }
 
@@ -575,6 +629,13 @@ impl Segmenter {
 
         // Update the MPD manifest
         self.write_manifest().await?;
+
+        // Update index info
+        let now = Utc::now().timestamp_millis();
+        self.index_info.end_time = now;
+        self.index_info.duration = (now - self.index_info.start_time).max(0) as u64;
+        self.write_index_json().await?;
+
         Ok(())
     }
 
@@ -797,6 +858,11 @@ impl Segmenter {
                 );
                 e
             })
+    }
+
+    async fn write_index_json(&self) -> Result<()> {
+        let json = serde_json::to_string_pretty(&self.index_info)?;
+        self.store_file(INDEX_FILENAME, json.into_bytes()).await
     }
 
     /// Generate SegmentTimeline XML from segment info

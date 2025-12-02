@@ -39,6 +39,7 @@ pub struct PeerForward {
     pub(crate) stream: String,
     publish_lock: Arc<Mutex<()>>,
     internal: Arc<PeerForwardInternal>,
+    disable_vp8: bool,
 }
 
 #[cfg(feature = "recorder")]
@@ -51,11 +52,16 @@ pub struct AudioTrackInfo {
 }
 
 impl PeerForward {
-    pub fn new(stream: impl ToString, ice_server: Vec<RTCIceServer>) -> Self {
+    pub fn new(
+        stream: impl ToString,
+        ice_server: Vec<RTCIceServer>,
+        disable_vp8: bool,
+    ) -> Self {
         PeerForward {
             stream: stream.to_string(),
             publish_lock: Arc::new(Mutex::new(())),
             internal: Arc::new(PeerForwardInternal::new(stream, ice_server)),
+            disable_vp8,
         }
     }
 
@@ -91,7 +97,7 @@ impl PeerForward {
 impl PeerForward {
     pub async fn set_publish(
         &self,
-        offer: RTCSessionDescription,
+        mut offer: RTCSessionDescription,
     ) -> Result<(RTCSessionDescription, String)> {
         if self.internal.publish_is_some().await {
             return Err(AppError::stream_already_exists(
@@ -103,6 +109,9 @@ impl PeerForward {
             return Err(AppError::stream_already_exists(
                 "A connection has already been established",
             ));
+        }
+        if self.disable_vp8 {
+            offer = filter_vp8(offer);
         }
         let peer = self
             .new_publish_peer(MediaInfo::try_from(offer.unmarshal()?)?)
@@ -133,7 +142,10 @@ impl PeerForward {
                 has_data_channel: false,
             })
             .await?;
-        let offer = peer.create_offer(None).await?;
+        let mut offer = peer.create_offer(None).await?;
+        if self.disable_vp8 {
+            offer = filter_vp8(offer);
+        }
         let mut gather_complete = peer.gathering_complete_promise().await;
         peer.set_local_description(offer).await?;
         let _ = gather_complete.recv().await;
@@ -290,8 +302,11 @@ impl PeerForward {
 impl PeerForward {
     pub async fn add_subscribe(
         &self,
-        offer: RTCSessionDescription,
+        mut offer: RTCSessionDescription,
     ) -> Result<(RTCSessionDescription, String)> {
+        if self.disable_vp8 {
+            offer = filter_vp8(offer);
+        }
         let media_info = MediaInfo::try_from(offer.unmarshal()?)?;
         let peer = self.new_subscription_peer(media_info.clone()).await?;
         let (sdp, session) = (
@@ -484,6 +499,55 @@ fn parse_ice_candidate(content: String) -> Result<Vec<RTCIceCandidateInit>> {
         }
     }
     Ok(ice_candidates)
+}
+
+fn filter_vp8(mut sdp: RTCSessionDescription) -> RTCSessionDescription {
+    if let Ok(mut session) = SessionDescription::unmarshal(&mut Cursor::new(sdp.sdp.as_bytes())) {
+        for media in &mut session.media_descriptions {
+            let mut vp8_pts = Vec::new();
+            media.attributes.retain(|attr| {
+                if attr.key == "rtpmap" {
+                    if let Some(val) = &attr.value {
+                        if val.to_uppercase().contains("VP8") {
+                            if let Some(pt_str) = val.split_whitespace().next() {
+                                if let Ok(pt) = pt_str.parse::<u8>() {
+                                    vp8_pts.push(pt);
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                true
+            });
+
+            media.attributes.retain(|attr| {
+                if attr.key == "fmtp" || attr.key == "rtcp-fb" {
+                    if let Some(val) = &attr.value {
+                        if let Some(pt_str) = val.split_whitespace().next() {
+                            if let Ok(pt) = pt_str.parse::<u8>() {
+                                if vp8_pts.contains(&pt) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+                true
+            });
+
+            media.media_name.formats.retain(|fmt| {
+                if let Ok(pt) = fmt.parse::<u8>() {
+                    !vp8_pts.contains(&pt)
+                } else {
+                    true
+                }
+            });
+        }
+
+        sdp.sdp = session.marshal();
+    }
+    sdp
 }
 
 #[cfg(test)]
