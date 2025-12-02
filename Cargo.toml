@@ -37,6 +37,10 @@ path = "src/whepfrom.rs"
 name = "net4mqtt"
 path = "src/net4mqtt.rs"
 
+[[bin]]
+name = "livevod"
+path = "src/livevod.rs"
+
 [workspace]
 members = [
     ".",
@@ -52,6 +56,7 @@ members = [
     "liveman",
     "livetwo",
     "livecam",
+    "livevod",
 ]
 
 [workspace.package]
@@ -101,6 +106,7 @@ liveion = { path = "liveion" }
 liveman = { path = "liveman" }
 livetwo = { path = "livetwo" }
 livecam = { path = "livecam" }
+livevod = { path = "livevod" }
 net4mqtt = { path = "libs/net4mqtt" }
 signal = { path = "libs/signal" }
 
