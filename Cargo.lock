@@ -2411,6 +2411,7 @@ dependencies = [
  "liveion",
  "liveman",
  "livetwo",
+ "livevod",
  "net4mqtt",
  "reqwest",
  "serde",
@@ -2560,6 +2561,21 @@ dependencies = [
  "tracing",
  "url",
  "webrtc",
+]
+
+[[package]]
+name = "livevod"
+version = "0.8.1"
+dependencies = [
+ "anyhow",
+ "axum 0.8.6",
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]
