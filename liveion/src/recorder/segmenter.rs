@@ -187,7 +187,7 @@ impl Segmenter {
 
         // Read existing index
         let mut index = match self.op.read(&index_path).await {
-            Ok(bytes) => serde_json::from_slice::<RecordingIndex>(&bytes).unwrap_or_default(),
+            Ok(bytes) => serde_json::from_slice::<RecordingIndex>(&bytes.to_vec()).unwrap_or_default(),
             Err(_) => RecordingIndex::default(),
         };
 

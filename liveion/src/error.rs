@@ -6,6 +6,7 @@ pub enum AppError {
     StreamNotFound(String),
     StreamAlreadyExists(String),
     SessionNotFound(String),
+    NotFound,
     Throw(String),
     InternalServerError(anyhow::Error),
 }
@@ -46,6 +47,7 @@ impl IntoResponse for AppError {
             AppError::StreamNotFound(err) => (StatusCode::NOT_FOUND, err).into_response(),
             AppError::StreamAlreadyExists(err) => (StatusCode::CONFLICT, err).into_response(),
             AppError::SessionNotFound(err) => (StatusCode::NOT_FOUND, err).into_response(),
+            AppError::NotFound => (StatusCode::NOT_FOUND, "Not Found").into_response(),
             AppError::InternalServerError(err) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
             }

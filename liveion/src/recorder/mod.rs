@@ -27,7 +27,7 @@ mod fmp4;
 static TASKS: Lazy<RwLock<HashMap<String, RecordingTask>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
 
-static STORAGE: Lazy<RwLock<Option<Operator>>> = Lazy::new(|| RwLock::new(None));
+pub static STORAGE: Lazy<RwLock<Option<Operator>>> = Lazy::new(|| RwLock::new(None));
 
 #[derive(Clone, Debug)]
 pub struct RecordingInfo {

@@ -8,6 +8,7 @@ pub mod recorder;
 pub mod session;
 pub mod strategy;
 pub mod stream;
+pub mod vod;
 pub mod whep;
 pub mod whip;
 

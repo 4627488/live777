@@ -66,6 +66,7 @@ recorder = [
     "dep:byteorder",
     "dep:url",
     "dep:scuffle-h265",
+    "dep:mime_guess",
 ]
 
 [dev-dependencies]
