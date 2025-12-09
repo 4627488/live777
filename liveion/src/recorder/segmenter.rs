@@ -6,7 +6,7 @@ use anyhow::Result;
 use bytes::Bytes;
 use chrono::Utc;
 use opendal::Operator;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 /// Default duration of each segment in seconds
 const DEFAULT_SEG_DURATION: u64 = 10;
@@ -97,7 +97,7 @@ pub struct Segmenter {
     // keyframe request tracking with intelligent backoff
     pli_backoff: PliBackoff,
 
-        // active video codec adapter
+    // active video codec adapter
     video_codec_kind: Option<VideoCodec>,
     video_adapter: Option<Box<dyn CodecAdapter>>,
 
@@ -187,7 +187,9 @@ impl Segmenter {
 
         // Read existing index
         let mut index = match self.op.read(&index_path).await {
-            Ok(bytes) => serde_json::from_slice::<RecordingIndex>(&bytes.to_vec()).unwrap_or_default(),
+            Ok(bytes) => {
+                serde_json::from_slice::<RecordingIndex>(&bytes.to_vec()).unwrap_or_default()
+            }
             Err(_) => RecordingIndex::default(),
         };
 

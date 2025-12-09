@@ -8,7 +8,7 @@ use axum::{
 use axum_extra::extract::Query;
 use http::header;
 
-use crate::{AppState, result::Result};
+use crate::{AppState, result::Result, service::recordings_index::RecordingsIndexService};
 
 pub fn route() -> Router<AppState> {
     Router::new()
@@ -21,6 +21,8 @@ pub fn route() -> Router<AppState> {
                 .delete(stop_record),
         )
         .route("/api/record/object/{*path}", get(get_segment))
+        .route("/api/storage/presign_upload", post(presign_upload))
+        .route("/api/record/sync", post(sync_record))
 }
 
 async fn get_segment(State(state): State<AppState>, Path(path): Path<String>) -> Result<Response> {
@@ -314,4 +316,61 @@ async fn stop_record(
         }
     }
     Ok(Json(serde_json::json!({ "stopped": any_stopped })))
+}
+
+#[derive(serde::Deserialize)]
+struct PresignUploadRequest {
+    stream_id: String,
+    filename: String,
+}
+
+#[derive(serde::Serialize)]
+struct PresignUploadResponse {
+    url: String,
+    headers: std::collections::HashMap<String, String>,
+}
+
+async fn presign_upload(
+    State(state): State<AppState>,
+    Json(req): Json<PresignUploadRequest>,
+) -> Result<Json<PresignUploadResponse>> {
+    #[cfg(feature = "recorder")]
+    {
+        if let Some(ref operator) = state.file_storage {
+            // Construct path: recordings/{stream_id}/{filename}
+            let path = format!("recordings/{}/{}", req.stream_id, req.filename);
+            
+            // Presign write
+            let signed_req = operator.presign_write(&path, std::time::Duration::from_secs(3600)).await?;
+            
+            let url = signed_req.uri().to_string();
+            let mut headers = std::collections::HashMap::new();
+            for (k, v) in signed_req.header() {
+                if let Ok(val_str) = v.to_str() {
+                    headers.insert(k.to_string(), val_str.to_string());
+                }
+            }
+            
+             Ok(Json(PresignUploadResponse { url, headers }))
+        } else {
+             Err(crate::error::AppError::InternalServerError(anyhow::anyhow!("Storage not configured")))
+        }
+    }
+    #[cfg(not(feature = "recorder"))]
+    Err(crate::error::AppError::InternalServerError(anyhow::anyhow!("Recorder feature disabled")))
+}#[derive(serde::Deserialize)]
+struct SyncRecordRequest {
+    stream_id: String,
+    record_id: String,
+    mpd_path: String,
+}
+
+async fn sync_record(
+    State(state): State<AppState>,
+    Json(req): Json<SyncRecordRequest>,
+) -> Result<Json<serde_json::Value>> {
+    let db = &state.database.connection;
+    RecordingsIndexService::upsert(db, &req.stream_id, &req.record_id, &req.mpd_path).await?;
+    
+    Ok(Json(serde_json::json!({"status": "ok"})))
 }
