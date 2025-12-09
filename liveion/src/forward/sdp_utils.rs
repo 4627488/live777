@@ -14,17 +14,14 @@ pub fn remove_vp8_from_sdp(sdp: &str) -> Result<String> {
         // 1. Find VP8 payload types from rtpmap
         // a=rtpmap:<payload_type> <encoding_name>/<clock_rate>...
         for attr in &media.attributes {
-            if attr.key == "rtpmap" {
-                if let Some(value) = &attr.value {
-                    if value.to_uppercase().contains("VP8") {
-                        // value format: "96 VP8/90000"
-                        if let Some(pt_str) = value.split_whitespace().next() {
-                            if let Ok(pt) = pt_str.parse::<u8>() {
-                                vp8_payload_types.push(pt);
-                            }
-                        }
-                    }
-                }
+            if attr.key == "rtpmap"
+                && let Some(value) = &attr.value
+                && value.to_uppercase().contains("VP8")
+                && let Some(pt_str) = value.split_whitespace().next()
+                && let Ok(pt) = pt_str.parse::<u8>()
+            {
+                // value format: "96 VP8/90000"
+                vp8_payload_types.push(pt);
             }
         }
 

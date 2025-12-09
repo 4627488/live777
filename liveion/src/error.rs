@@ -6,6 +6,7 @@ pub enum AppError {
     StreamNotFound(String),
     StreamAlreadyExists(String),
     SessionNotFound(String),
+    #[cfg_attr(not(feature = "recorder"), allow(dead_code))]
     NotFound,
     Throw(String),
     InternalServerError(anyhow::Error),

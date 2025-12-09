@@ -339,10 +339,12 @@ async fn presign_upload(
         if let Some(ref operator) = state.file_storage {
             // Construct path: recordings/{stream_id}/{filename}
             let path = format!("recordings/{}/{}", req.stream_id, req.filename);
-            
+
             // Presign write
-            let signed_req = operator.presign_write(&path, std::time::Duration::from_secs(3600)).await?;
-            
+            let signed_req = operator
+                .presign_write(&path, std::time::Duration::from_secs(3600))
+                .await?;
+
             let url = signed_req.uri().to_string();
             let mut headers = std::collections::HashMap::new();
             for (k, v) in signed_req.header() {
@@ -350,15 +352,26 @@ async fn presign_upload(
                     headers.insert(k.to_string(), val_str.to_string());
                 }
             }
-            
-             Ok(Json(PresignUploadResponse { url, headers }))
+
+            Ok(Json(PresignUploadResponse { url, headers }))
         } else {
-             Err(crate::error::AppError::InternalServerError(anyhow::anyhow!("Storage not configured")))
+            Err(crate::error::AppError::InternalServerError(
+                anyhow::anyhow!("Storage not configured"),
+            ))
         }
     }
     #[cfg(not(feature = "recorder"))]
-    Err(crate::error::AppError::InternalServerError(anyhow::anyhow!("Recorder feature disabled")))
-}#[derive(serde::Deserialize)]
+    {
+        let _ = state;
+        let _ = req.stream_id;
+        let _ = req.filename;
+        Err(crate::error::AppError::InternalServerError(
+            anyhow::anyhow!("Recorder feature disabled"),
+        ))
+    }
+}
+
+#[derive(serde::Deserialize)]
 struct SyncRecordRequest {
     stream_id: String,
     record_id: String,
@@ -371,6 +384,6 @@ async fn sync_record(
 ) -> Result<Json<serde_json::Value>> {
     let db = &state.database.connection;
     RecordingsIndexService::upsert(db, &req.stream_id, &req.record_id, &req.mpd_path).await?;
-    
+
     Ok(Json(serde_json::json!({"status": "ok"})))
 }
