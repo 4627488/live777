@@ -403,8 +403,8 @@ impl RecordingTask {
                 }
             }
 
-            if let Err(e) = segmenter.flush().await {
-                tracing::debug!("[recorder] {} flush error: {}", stream_name_cloned, e);
+            if let Err(e) = segmenter.close_session().await {
+                tracing::debug!("[recorder] {} close session error: {}", stream_name_cloned, e);
             }
         });
 

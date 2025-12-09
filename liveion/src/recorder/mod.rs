@@ -19,6 +19,7 @@ use crate::config::RecorderConfig;
 mod pli_backoff;
 mod segmenter;
 mod task;
+pub mod meta;
 use task::RecordingTask;
 pub mod codec;
 mod fmp4;

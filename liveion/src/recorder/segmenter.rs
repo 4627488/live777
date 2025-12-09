@@ -1,10 +1,12 @@
 use crate::recorder::codec::{CodecAdapter, VideoCodec, create_video_adapter};
 use crate::recorder::fmp4::{Fmp4Writer, Mp4Sample};
+use crate::recorder::meta::{RecordingIndex, RecordingIndexItem, RecordingMeta, RecordingStatus};
 use crate::recorder::pli_backoff::PliBackoff;
 use anyhow::Result;
 use bytes::Bytes;
+use chrono::Utc;
 use opendal::Operator;
-use tracing::info;
+use tracing::{error, info, warn};
 
 /// Default duration of each segment in seconds
 const DEFAULT_SEG_DURATION: u64 = 10;
@@ -95,9 +97,13 @@ pub struct Segmenter {
     // keyframe request tracking with intelligent backoff
     pli_backoff: PliBackoff,
 
-    // active video codec adapter
+        // active video codec adapter
     video_codec_kind: Option<VideoCodec>,
     video_adapter: Option<Box<dyn CodecAdapter>>,
+
+    // New fields
+    start_time_unix: i64,
+    max_duration_seconds: u64,
 
     /// List of completed segments with their actual durations
     segments: Vec<SegmentInfo>,
@@ -149,9 +155,90 @@ impl Segmenter {
 
             video_codec_kind: None,
             video_adapter: None,
+            start_time_unix: Utc::now().timestamp(),
+            max_duration_seconds: 3600,
             segments: Vec::new(),
             audio_segments: Vec::new(),
         })
+    }
+
+    pub async fn close_session(&mut self) -> Result<()> {
+        // Ensure all pending data is written
+        self.flush().await?;
+
+        // 1. Write meta.json
+        let meta = RecordingMeta {
+            start_time: self.start_time_unix,
+            end_time: Utc::now().timestamp(),
+            duration: self.total_ticks as f64 / self.timescale as f64,
+            size: self.total_bytes + self.audio_total_bytes,
+            video_codec: self.video_codec.clone(),
+            audio_codec: Some(self.audio_codec.clone()),
+            width: self.video_width,
+            height: self.video_height,
+        };
+
+        let meta_json = serde_json::to_vec_pretty(&meta)?;
+        let meta_path = format!("{}/meta.json", self.path_prefix);
+        self.op.write(&meta_path, meta_json).await?;
+
+        // 2. Update index.json
+        let index_path = format!("{}/index.json", self.stream);
+
+        // Read existing index
+        let mut index = match self.op.read(&index_path).await {
+            Ok(bytes) => serde_json::from_slice::<RecordingIndex>(&bytes).unwrap_or_default(),
+            Err(_) => RecordingIndex::default(),
+        };
+
+        // Add new item
+        let relative_path = format!("{}/", self.start_time_unix);
+
+        index.items.push(RecordingIndexItem {
+            stream_id: self.stream.clone(),
+            start_time: self.start_time_unix,
+            duration: meta.duration,
+            path: relative_path,
+            status: RecordingStatus::LocalSaved,
+        });
+
+        let index_json = serde_json::to_vec_pretty(&index)?;
+        self.op.write(&index_path, index_json).await?;
+
+        info!(
+            "Closed session for stream {}, meta and index updated",
+            self.stream
+        );
+        Ok(())
+    }
+
+    pub async fn rotate(&mut self) -> Result<()> {
+        info!("Rotating session for stream {}", self.stream);
+        if let Err(e) = self.close_session().await {
+            error!("Failed to close session during rotation: {}", e);
+        }
+
+        // Reset state
+        self.start_time_unix = Utc::now().timestamp();
+        // path_prefix: /{stream_id}/{timestamp}/
+        self.path_prefix = format!("{}/{}", self.stream, self.start_time_unix);
+
+        self.segments.clear();
+        self.audio_segments.clear();
+        self.total_bytes = 0;
+        self.total_ticks = 0;
+        self.audio_total_bytes = 0;
+        self.audio_total_ticks = 0;
+
+        // Reset writers
+        self.fmp4_writer = None;
+        self.audio_writer = None;
+
+        // Reset counters
+        self.video_seg_index = 0;
+        self.audio_seg_index = 0;
+
+        Ok(())
     }
 
     /// Feed one H.264 Frame (Annex-B format, may contain multiple NALUs)
@@ -263,6 +350,12 @@ impl Segmenter {
         let is_sync = explicit_sync.unwrap_or(false) || adapter_sync;
 
         if is_sync {
+            // Check for rotation
+            let current_duration = Utc::now().timestamp() - self.start_time_unix;
+            if current_duration >= self.max_duration_seconds as i64 {
+                self.rotate().await?;
+            }
+
             self.pli_backoff.record_keyframe();
         }
 

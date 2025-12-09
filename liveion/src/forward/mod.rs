@@ -26,6 +26,7 @@ mod media;
 pub mod message;
 mod publish;
 pub mod rtcp;
+mod sdp_utils;
 mod subscribe;
 mod track;
 
@@ -91,7 +92,7 @@ impl PeerForward {
 impl PeerForward {
     pub async fn set_publish(
         &self,
-        offer: RTCSessionDescription,
+        mut offer: RTCSessionDescription,
     ) -> Result<(RTCSessionDescription, String)> {
         if self.internal.publish_is_some().await {
             return Err(AppError::stream_already_exists(
@@ -104,6 +105,17 @@ impl PeerForward {
                 "A connection has already been established",
             ));
         }
+
+        // Filter VP8 from offer to force H.264/H.265 negotiation
+        match sdp_utils::remove_vp8_from_sdp(&offer.sdp) {
+            Ok(filtered_sdp) => {
+                offer.sdp = filtered_sdp;
+            }
+            Err(e) => {
+                tracing::warn!("Failed to filter VP8 from SDP: {}", e);
+            }
+        }
+
         let peer = self
             .new_publish_peer(MediaInfo::try_from(offer.unmarshal()?)?)
             .await?;
