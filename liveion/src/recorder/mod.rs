@@ -16,10 +16,11 @@ use crate::stream::manager::Manager;
 #[cfg(feature = "recorder")]
 use crate::config::RecorderConfig;
 
+pub mod meta;
 mod pli_backoff;
 mod segmenter;
+mod sync;
 mod task;
-pub mod meta;
 use task::RecordingTask;
 pub mod codec;
 mod fmp4;
@@ -41,27 +42,30 @@ pub async fn init(manager: Arc<Manager>, cfg: RecorderConfig) {
     let manager_clone = manager.clone();
 
     // Initialize storage Operator
-    {
+    let sync_operator = {
         let mut storage_writer = STORAGE.write().await;
-        if storage_writer.is_none() {
+        if let Some(existing) = storage_writer.as_ref() {
+            tracing::debug!("[recorder] reusing existing storage operator");
+            Some(existing.clone())
+        } else {
             tracing::info!(
                 "[recorder] initializing storage operator with config: {:?}",
                 cfg.storage
             );
             match init_operator(&cfg.storage).await {
                 Ok(op) => {
-                    *storage_writer = Some(op);
                     tracing::info!("[recorder] storage backend initialized successfully");
+                    let clone_for_sync = op.clone();
+                    *storage_writer = Some(op);
+                    Some(clone_for_sync)
                 }
                 Err(e) => {
                     tracing::error!("[recorder] failed to initialize storage backend: {}", e);
                     return;
                 }
             }
-        } else {
-            tracing::debug!("[recorder] storage operator already initialized");
         }
-    }
+    };
 
     let cfg = Arc::new(cfg);
     let cfg_for_events = cfg.clone();
@@ -104,6 +108,10 @@ pub async fn init(manager: Arc<Manager>, cfg: RecorderConfig) {
         });
     } else {
         tracing::info!("[recorder] max_recording_seconds is 0, automatic rotation disabled");
+    }
+
+    if let Some(op) = sync_operator {
+        sync::spawn(op, cfg.clone());
     }
 }
 

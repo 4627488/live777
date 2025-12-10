@@ -41,3 +41,11 @@ pub fn strategy() -> &'static str {
 pub fn record(stream: &str) -> String {
     format!("/api/record/{stream}")
 }
+
+pub fn storage_presign_upload() -> &'static str {
+    "/api/storage/presign_upload"
+}
+
+pub fn record_sync() -> &'static str {
+    "/api/record/sync"
+}

@@ -73,6 +73,65 @@ Path parameter: Storage path of the segment file (URL encoded)
 
 Response: [200] Binary media data or [302] redirect to storage URL
 
+### Presign Upload URL
+
+Generate a presigned URL for uploading recording files (used by LiveIon).
+
+`POST` `/api/storage/presign_upload`
+
+Request Body:
+```json
+{
+  "stream_id": "camera01",
+  "filename": "2025/07/24/init.m4s",
+  "method": "PUT"
+}
+```
+
+Response: [200] `application/json`
+```json
+{
+  "url": "https://s3.region.amazonaws.com/bucket/recordings/camera01/2025/07/24/init.m4s?signature=...",
+  "method": "PUT",
+  "headers": {
+    "Content-Type": "application/octet-stream"
+  }
+}
+```
+
+### Sync Recording Index
+
+Synchronize recording index from LiveIon to LiveMan database.
+
+`POST` `/api/record/sync`
+
+Request Body:
+```json
+{
+  "stream_id": "camera01",
+  "start_time": 1721800000,
+  "duration": 3600.0,
+  "path": "recordings/camera01/1721800000/manifest.mpd",
+  "meta": {
+    "start_time": 1721800000,
+    "end_time": 1721803600,
+    "duration": 3600.0,
+    "size": 123456789,
+    "video_codec": "avc1.64001f",
+    "audio_codec": "opus",
+    "width": 1920,
+    "height": 1080
+  }
+}
+```
+
+Response: [200] `application/json`
+```json
+{
+  "status": "ok"
+}
+```
+
 ## Node
 
 `GET` `/api/nodes/`

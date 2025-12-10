@@ -404,7 +404,11 @@ impl RecordingTask {
             }
 
             if let Err(e) = segmenter.close_session().await {
-                tracing::debug!("[recorder] {} close session error: {}", stream_name_cloned, e);
+                tracing::debug!(
+                    "[recorder] {} close session error: {}",
+                    stream_name_cloned,
+                    e
+                );
             }
         });
 

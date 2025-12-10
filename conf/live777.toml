@@ -24,6 +24,16 @@ auto_streams = ["*"] # Record all streams
 type = "fs"
 root = "./records"
 
+# Optional: enable asynchronous cloud sync via Liveman
+[recorder.sync]
+# enabled = true
+# liveman_url = "https://liveman.example.com"
+# api_token = "s3cr3t-token"
+# Sync interval in seconds (min 5s)
+# interval_seconds = 30
+# Maximum recordings to sync per stream per interval (0 = unlimited)
+# batch_limit = 2
+
 # AWS S3 with explicit credentials
 #type = "s3"
 #bucket = "my-live777-bucket"

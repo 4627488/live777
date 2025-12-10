@@ -136,6 +136,10 @@ pub struct RecorderConfig {
     /// Maximum duration in seconds for a single recording before rotation (0 disables auto-rotation)
     #[serde(default = "default_max_recording_seconds")]
     pub max_recording_seconds: u64,
+
+    /// Cloud sync configuration
+    #[serde(default)]
+    pub sync: RecorderSyncConfig,
 }
 
 #[cfg(feature = "recorder")]
@@ -151,6 +155,45 @@ impl Default for RecorderConfig {
             storage: Default::default(),
             node_alias: None,
             max_recording_seconds: default_max_recording_seconds(),
+            sync: Default::default(),
+        }
+    }
+}
+
+#[cfg(feature = "recorder")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecorderSyncConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub liveman_url: String,
+    #[serde(default)]
+    pub api_token: Option<String>,
+    #[serde(default = "default_sync_interval_seconds")]
+    pub interval_seconds: u64,
+    #[serde(default = "default_sync_batch_limit")]
+    pub batch_limit: usize,
+}
+
+#[cfg(feature = "recorder")]
+fn default_sync_interval_seconds() -> u64 {
+    30
+}
+
+#[cfg(feature = "recorder")]
+fn default_sync_batch_limit() -> usize {
+    2
+}
+
+#[cfg(feature = "recorder")]
+impl Default for RecorderSyncConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            liveman_url: String::new(),
+            api_token: None,
+            interval_seconds: default_sync_interval_seconds(),
+            batch_limit: default_sync_batch_limit(),
         }
     }
 }

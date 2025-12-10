@@ -6,7 +6,9 @@ use axum::{
     routing::{get, post},
 };
 use axum_extra::extract::Query;
+use chrono::Utc;
 use http::header;
+use std::collections::HashMap;
 
 use crate::{AppState, result::Result, service::recordings_index::RecordingsIndexService};
 
@@ -103,6 +105,9 @@ async fn get_segment(State(state): State<AppState>, Path(path): Path<String>) ->
 struct RecordingIndexEntry {
     record: String,
     mpd_path: String,
+    start_time: Option<i64>,
+    duration: Option<f64>,
+    meta: Option<serde_json::Value>,
 }
 
 async fn list_index_streams(State(state): State<AppState>) -> Result<Json<Vec<String>>> {
@@ -135,6 +140,9 @@ async fn list_index_by_stream(
         .map(|m| RecordingIndexEntry {
             record: m.record,
             mpd_path: m.mpd_path,
+            start_time: m.start_time,
+            duration: m.duration,
+            meta: m.meta,
         })
         .collect();
     Ok(Json(entries))
@@ -225,6 +233,9 @@ async fn start_record(
         &stream,
         &record_ts,
         &mpd_path,
+        None,
+        None,
+        None,
     )
     .await
     {
@@ -318,64 +329,82 @@ async fn stop_record(
     Ok(Json(serde_json::json!({ "stopped": any_stopped })))
 }
 
+fn default_presign_method() -> String {
+    "PUT".to_string()
+}
+
+#[cfg_attr(not(feature = "recorder"), allow(dead_code))]
 #[derive(serde::Deserialize)]
 struct PresignUploadRequest {
     stream_id: String,
     filename: String,
+    #[serde(default = "default_presign_method")]
+    method: String,
 }
 
 #[derive(serde::Serialize)]
 struct PresignUploadResponse {
     url: String,
-    headers: std::collections::HashMap<String, String>,
+    method: String,
+    headers: HashMap<String, String>,
 }
 
 async fn presign_upload(
     State(state): State<AppState>,
     Json(req): Json<PresignUploadRequest>,
 ) -> Result<Json<PresignUploadResponse>> {
-    #[cfg(feature = "recorder")]
-    {
-        if let Some(ref operator) = state.file_storage {
-            // Construct path: recordings/{stream_id}/{filename}
-            let path = format!("recordings/{}/{}", req.stream_id, req.filename);
-
-            // Presign write
-            let signed_req = operator
-                .presign_write(&path, std::time::Duration::from_secs(3600))
-                .await?;
-
-            let url = signed_req.uri().to_string();
-            let mut headers = std::collections::HashMap::new();
-            for (k, v) in signed_req.header() {
-                if let Ok(val_str) = v.to_str() {
-                    headers.insert(k.to_string(), val_str.to_string());
-                }
-            }
-
-            Ok(Json(PresignUploadResponse { url, headers }))
-        } else {
-            Err(crate::error::AppError::InternalServerError(
-                anyhow::anyhow!("Storage not configured"),
-            ))
-        }
-    }
     #[cfg(not(feature = "recorder"))]
     {
         let _ = state;
-        let _ = req.stream_id;
-        let _ = req.filename;
-        Err(crate::error::AppError::InternalServerError(
+        let _ = req;
+        return Err(crate::error::AppError::InternalServerError(
             anyhow::anyhow!("Recorder feature disabled"),
-        ))
+        ));
+    }
+
+    #[cfg(feature = "recorder")]
+    {
+        let operator = state.file_storage.as_ref().ok_or_else(|| {
+            crate::error::AppError::InternalServerError(anyhow::anyhow!("Storage not configured",))
+        })?;
+
+        let method = req.method.trim().to_ascii_uppercase();
+        if method != "PUT" {
+            return Err(crate::error::AppError::RequestProxyError);
+        }
+
+        // Avoid duplicate slashes when joining path
+        let sanitized_filename = req.filename.trim_start_matches('/');
+        let path = format!("recordings/{}/{}", req.stream_id, sanitized_filename);
+
+        let signed_req = operator
+            .presign_write(&path, std::time::Duration::from_secs(3600))
+            .await?;
+
+        let url = signed_req.uri().to_string();
+        let mut headers = HashMap::new();
+        for (k, v) in signed_req.header() {
+            if let Ok(val_str) = v.to_str() {
+                headers.insert(k.to_string(), val_str.to_string());
+            }
+        }
+
+        Ok(Json(PresignUploadResponse {
+            url,
+            method,
+            headers,
+        }))
     }
 }
 
 #[derive(serde::Deserialize)]
 struct SyncRecordRequest {
     stream_id: String,
-    record_id: String,
-    mpd_path: String,
+    start_time: Option<i64>,
+    duration: Option<f64>,
+    path: String,
+    #[serde(default)]
+    meta: Option<serde_json::Value>,
 }
 
 async fn sync_record(
@@ -383,7 +412,21 @@ async fn sync_record(
     Json(req): Json<SyncRecordRequest>,
 ) -> Result<Json<serde_json::Value>> {
     let db = &state.database.connection;
-    RecordingsIndexService::upsert(db, &req.stream_id, &req.record_id, &req.mpd_path).await?;
+    let record_id = req
+        .start_time
+        .map(|ts| ts.to_string())
+        .unwrap_or_else(|| Utc::now().timestamp().to_string());
+
+    RecordingsIndexService::upsert(
+        db,
+        &req.stream_id,
+        &record_id,
+        &req.path,
+        req.start_time,
+        req.duration,
+        req.meta,
+    )
+    .await?;
 
     Ok(Json(serde_json::json!({"status": "ok"})))
 }

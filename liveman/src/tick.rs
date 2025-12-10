@@ -218,6 +218,9 @@ async fn do_auto_record_check(mut state: AppState) -> Result<()> {
                                 &stream_id,
                                 &record_ts,
                                 &mpd_path,
+                                None,
+                                None,
+                                None,
                             )
                             .await
                             {
@@ -376,6 +379,9 @@ async fn do_auto_record_rotate(mut state: AppState) -> Result<()> {
                     stream_id,
                     &record_ts,
                     &mpd_path,
+                    None,
+                    None,
+                    None,
                 )
                 .await
                 {

@@ -1,6 +1,8 @@
 use anyhow::Result;
 use chrono::{FixedOffset, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, JsonValue, QueryFilter, Set,
+};
 use uuid::Uuid;
 
 use crate::entity::recordings::{self, Entity as Recordings};
@@ -9,11 +11,15 @@ use crate::entity::recordings::{self, Entity as Recordings};
 pub struct RecordingsIndexService;
 
 impl RecordingsIndexService {
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert(
         db: &DatabaseConnection,
         stream: &str,
         record: &str,
         mpd_path: &str,
+        start_time: Option<i64>,
+        duration: Option<f64>,
+        meta: Option<JsonValue>,
     ) -> Result<recordings::Model> {
         if let Some(existing) = Recordings::find()
             .filter(recordings::Column::Stream.eq(stream))
@@ -23,6 +29,9 @@ impl RecordingsIndexService {
         {
             let mut am: recordings::ActiveModel = existing.into();
             am.mpd_path = Set(mpd_path.to_string());
+            am.start_time = Set(start_time);
+            am.duration = Set(duration);
+            am.meta = Set(meta.clone());
             am.updated_at = Set(Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()));
             Ok(am.update(db).await?)
         } else {
@@ -32,6 +41,9 @@ impl RecordingsIndexService {
                 stream: Set(stream.to_string()),
                 record: Set(record.to_string()),
                 mpd_path: Set(mpd_path.to_string()),
+                start_time: Set(start_time),
+                duration: Set(duration),
+                meta: Set(meta.clone()),
                 created_at: Set(now_fixed),
                 updated_at: Set(now_fixed),
             };
