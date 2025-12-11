@@ -6,17 +6,50 @@ The Recorder in liveion is an optional feature that automatically records live s
 
 | container           | video codecs | audio codecs |
 | ------------------- | ------------| ------------ |
-| `Fragmented MP4`    | `H264`, `VP9`| `Opus`       |
+| `Fragmented MP4`    | `H264`, `VP9`, `H265` | `Opus`       |
 
-**Recorder does not support the `VP8` codec because `VP8` requires a `WebM` container.**
+**Note:** Recorder does not support `VP8` codec because `VP8` requires a `WebM` container, which is not compatible with Fragmented MP4.
 
-## Liveman Integration {#liveman}
+## Automatic Recording {#auto-recording}
 
-Integrates with [Liveman](/guide/liveman) for centralized playback and proxy access:
+When `auto_streams` patterns are configured, Live777 automatically starts recording when a matching stream goes **Up** (receives its first publisher) and stops when it goes **Down** (loses all publishers).
 
-- Start recording returns the storage metadata (`record_id`, `record_dir`, and `mpd_path`). The `record_id` field is only populated when the recorder can infer a 10-digit Unix timestamp from the output path; otherwise it is returned as an empty string.
-- Liveman stores `record_id`/`record_dir` to keep the catalog in sync with storage
-- Clients can stream the manifest via `mpd_path`, and Liveman can proxy objects with `GET /api/record/object/{path}`
+**Example:**
+```toml
+[recorder]
+auto_streams = ["*"]              # Record all streams
+# auto_streams = ["camera*", "room-*"]  # Record streams matching patterns
+```
+
+## Session Rotation {#rotation}
+
+Recording sessions are automatically rotated to manage file size and storage efficiency. When a session accumulates duration equal to `max_recording_seconds`, Live777:
+
+1. Closes the current set of media segments (`v_seg_*.m4s`, `a_seg_*.m4s`)
+2. Finalizes the manifest (MPD) for the completed session
+3. Creates a new timestamped directory with a fresh manifest
+4. Continues recording in the new session
+
+**Rotation behavior:**
+- **Disabled**: Set `max_recording_seconds = 0` to record indefinitely without rotation
+- **Default**: `max_recording_seconds = 86400` (24 hours)
+- **Check interval**: Rotation checks run every ~10% of the max duration interval to minimize latency
+
+This ensures recordings remain manageable while maintaining continuous capture.
+
+Integrates with [Liveman](/guide/liveman) for centralized playback, recording metadata synchronization, and proxy access:
+
+- **Manual Start**: Call `POST /api/record/:streamId` on a Live777 node returns the storage metadata (`record_id`, `record_dir`, and `mpd_path`)
+- **Metadata Sync**: Live777 automatically syncs completed recording metadata to Liveman via `POST /api/record/sync`
+- **Playback**: Liveman maintains a catalog of all recordings and proxies segment retrieval via `GET /api/record/object/{path}`
+- **Status Tracking**: Query recording status and retrieve playback index through Liveman's unified API
+
+### Recording ID
+
+The `record_id` field is a 10-digit Unix timestamp (seconds) extracted from the output path:
+- When using default paths: `record_id` is automatically populated with the session start timestamp
+- When using custom `base_dir`: `record_id` is empty unless the path ends with a 10-digit timestamp
+- Example: For path `camera01/1718200000/`, the `record_id` is `"1718200000"`
 
 ### Configuration
 
@@ -27,7 +60,7 @@ node_alias = "live777-node-001"
 ```
 
 ::: tip
-The node_alias is optional but recommended for multi-node deployments to help Liveman identify the source of recording metadata.
+The `node_alias` is optional but recommended for multi-node deployments to help Liveman identify the source of recording metadata and correctly route requests to the appropriate Live777 node.
 :::
 
 ## Configuration {#config}
@@ -56,9 +89,10 @@ root = "./storage"   # Root path for recordings (default: "./storage")
 
 #### Basic Options
 
-- `auto_streams`: Stream name patterns for auto-recording, supports wildcards (default: `[]`)
-- `max_recording_seconds`: Maximum duration (seconds) for a single recording session before rotation (default: `86400`, set to `0` to disable auto-rotation)
-- `node_alias`: Optional node identifier for multi-node deployments (default: not set)
+- `auto_streams`: Stream name patterns for auto-recording. Supports glob patterns with `*` and `?` wildcards (default: `[]`—no auto-recording)
+  - Examples: `["*"]` (all streams), `["camera*", "room-*"]` (pattern-based)
+- `max_recording_seconds`: Maximum cumulative duration (seconds) for a single recording session before automatic rotation (default: `86400` = 24 hours; set to `0` to disable auto-rotation)
+- `node_alias`: Optional node identifier for multi-node deployments. Used by Liveman to identify and track recordings from this node (default: not set)
 
 #### Storage Options
 
@@ -177,36 +211,138 @@ security_token = "..."
 
 ## Start/Status API {#api}
 
-Requires `recorder` feature.
+Requires `recorder` feature at compile time.
 
-- Start recording: `POST` `/api/record/:streamId`
-  - Body (optional): `{ "base_dir": "optional/path/prefix" }`
-  - Response: `{ "id": ":streamId", "record_id": "<unix-timestamp-or-empty>", "record_dir": "<path>", "mpd_path": "<path>/manifest.mpd" }`
-- Recording status: `GET` `/api/record/:streamId`
-  - Response: `{ "recording": true }`
-- Stop recording: `DELETE` `/api/record/:streamId`
+### Start Recording
+
+**Request:**
+```
+POST /api/record/:streamId
+Content-Type: application/json
+
+{
+  "base_dir": "optional/custom/path"
+}
+```
+
+- `base_dir` (optional): Override the storage path prefix. If omitted, Live777 uses `/:streamId/:record_id/` where `record_id` is the current Unix timestamp
+
+**Response:** `200 OK`
+```json
+{
+  "id": "camera01",
+  "record_id": "1718200000",
+  "record_dir": "camera01/1718200000",
+  "mpd_path": "camera01/1718200000/manifest.mpd"
+}
+```
+
+### Recording Status
+
+**Request:**
+```
+GET /api/record/:streamId
+```
+
+**Response:** `200 OK`
+```json
+{
+  "recording": true
+}
+```
+
+Returns `true` if the stream is currently being recorded on this node.
+
+### Stop Recording
+
+**Request:**
+```
+DELETE /api/record/:streamId
+```
+
+**Response:** `200 OK` (empty body)
+
+Stops the active recording session for the specified stream. Returns success even if no recording is active.
 
 ## MPD Path Conventions {#mpd}
 
-- Default `record_dir` (when `base_dir` is not provided): `/:streamId/:record_id/` where `record_id` is a 10-digit Unix timestamp (seconds).
-- Default MPD location: `/{record_dir}/manifest.mpd`.
-- When the cumulative duration for a session reaches `max_recording_seconds`, the recorder closes the current fragments and starts a new timestamped directory (for example `/:streamId/1718200000/`). No calendar-style paths are produced automatically.
-- When `base_dir` is provided, `record_dir` matches that value exactly and the manifest lives at `/{record_dir}/manifest.mpd`. If the override does not end with a 10-digit Unix timestamp, the returned `record_id` is an empty string.
+### Default Paths
+
+When `base_dir` is **not** provided:
+- `record_dir`: `/:streamId/:record_id/` where `record_id` is a 10-digit Unix timestamp (seconds) at session start
+- MPD location: `/:streamId/:record_id/manifest.mpd`
+
+**Example:** `camera01/1718200000/manifest.mpd` (for a session starting 2024-06-12 19:00:00 UTC)
+
+### Custom Paths
+
+When `base_dir` **is** provided:
+- `record_dir`: Matches the `base_dir` value exactly
+- MPD location: `/{base_dir}/manifest.mpd`
+- `record_id`: Empty string unless `base_dir` ends with a 10-digit timestamp
+
+**Example:**
+- Input: `base_dir = "recordings/mystream/2025-01-15"`
+- Output: `record_dir = "recordings/mystream/2025-01-15"`, `record_id = ""`
+
+### Rotation Paths
+
+When a session reaches `max_recording_seconds`:
+- The current session closes
+- A new directory is created with a fresh timestamp: `/:streamId/:new_record_id/`
+- No calendar-style directories are created automatically
+
+**Example:** After rotation at session 2-hour mark:
+```
+stream1/
+├── 1718200000/   (initial session, ~2 hours)
+│   ├── manifest.mpd
+│   ├── v_init.m4s
+│   ├── v_seg_0001.m4s
+│   └── ...
+└── 1718207200/   (new session after rotation)
+    ├── manifest.mpd
+    └── ...
+```
 
 ## File Structure {#file-structure}
 
-Recorded files are organized by `record_dir`:
+Recorded files are organized hierarchically within the storage backend:
 
 ```
-records/
+{storage_root}/
 └── stream1/
-    └── 1762842203/
+    ├── 1762842203/                    # Session 1 (Unix timestamp)
+    │   ├── manifest.mpd               # DASH manifest
+    │   ├── v_init.m4s                 # Video initialization segment
+    │   ├── a_init.m4s                 # Audio initialization segment
+    │   ├── v_seg_0001.m4s             # Video segment 1
+    │   ├── a_seg_0001.m4s             # Audio segment 1
+    │   ├── v_seg_0002.m4s
+    │   ├── a_seg_0002.m4s
+    │   └── ...
+    └── 1762845803/                    # Session 2 (after rotation)
         ├── manifest.mpd
         ├── v_init.m4s
         ├── a_init.m4s
-        ├── v_seg_0001.m4s
-        ├── a_seg_0001.m4s
         └── ...
 ```
 
-- Timestamp-based folders (`stream/1762842203`) are the canonical layout produced by Live777, including automatic rotations triggered by `max_recording_seconds`. Provide a custom `base_dir` only if you intentionally need a different structure and accept the impact on `record_id` values.
+### Segment Organization
+
+- **Initialization Segments**: `v_init.m4s` and `a_init.m4s` contain codec initialization data
+- **Media Segments**: `v_seg_NNNN.m4s` (video) and `a_seg_NNNN.m4s` (audio) are sequentially numbered
+- **Manifest**: `manifest.mpd` is the DASH-compliant MPD file describing the playback timeline
+
+### Storage Paths
+
+- **Timestamp-based folders** (`stream/1762842203/`) are the canonical layout produced by Live777
+- **Automatic rotations** maintain this layout; each new session gets its own timestamped directory
+- **Custom `base_dir`**: If provided, overrides the default layout. Use only if you have specific organizational needs
+
+### File Characteristics
+
+- All segments are **Fragmented MP4** format (ISO/IEC 14496-12:2015)
+- Each segment is independently seekable and decodable
+- Typical segment duration: 1-10 seconds (configurable per codec)
+- MPD manifest references all segments and their timing

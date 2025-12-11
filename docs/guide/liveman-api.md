@@ -24,74 +24,163 @@ Response: [204]
 
 ## Recording & Playback
 
-Recording and playback related APIs (proxy and index listing)
+Recording and playback related APIs for Liveman cluster (proxy, index listing, and recording management).
 
-### List Streams with Recording Index
+### List Streams with Recordings
 
 `GET` `/api/playback`
 
-Response: [200] `application/json`
-```json
-["camera01", "roomA", "web-0001"]
-```
+Retrieve a list of all streams that have recording index entries in Liveman's database.
 
-### List Index by Stream
-
-`GET` `/api/playback/{stream}`
-
-Response: [200] `application/json`
+**Response:** `200 OK` `application/json`
 ```json
 [
-  { "year": 2025, "month": 7, "day": 24, "mpd_path": "camera01/2025/07/24/manifest.mpd" }
+  "camera01",
+  "roomA",
+  "web-0001"
 ]
 ```
 
-### Get Segment File via Proxy
+### List Recording Index by Stream
+
+`GET` `/api/playback/{stream}`
+
+Retrieve all recording sessions for a specific stream stored in Liveman.
+
+**Response:** `200 OK` `application/json`
+```json
+[
+  {
+    "record": "camera01/1718200000",
+    "mpd_path": "camera01/1718200000/manifest.mpd",
+    "start_time": 1718200000,
+    "duration": 3600.0,
+    "meta": {
+      "video_codec": "avc1.64001f",
+      "audio_codec": "opus",
+      "width": 1920,
+      "height": 1080,
+      "size": 1234567890
+    }
+  }
+]
+```
+
+### Proxy Segment/Manifest Access
 
 `GET` `/api/record/object/{path}`
 
-- `path`: URL-encoded storage path of the recorded object (e.g. `camera01/2025/07/24/manifest.mpd`)
+Proxy access to recorded segment files and MPD manifests. Liveman retrieves files from the underlying storage backend and streams them to the client.
 
-Response: [200] Binary media data, content-type inferred by extension (e.g. `application/dash+xml` for `.mpd`, `video/mp4` for `.m4s`/`.mp4`).
+**Path parameter:** 
+- `path`: URL-encoded storage path of the recorded object (e.g., `camera01/1718200000/manifest.mpd` or `camera01/1718200000/v_seg_0001.m4s`)
 
+**Response:** `200 OK` - Binary media data
 
-Response: [200] `application/dash+xml`
+Content-Type inferred by file extension:
+- `.mpd` → `application/dash+xml`
+- `.m4s`, `.mp4` → `video/mp4` or `audio/mp4`
+- Other → `application/octet-stream`
+
+**Alternative Response:** `302 Found` redirect to storage backend presigned URL (when configured)
+
+**Example - MPD Manifest:**
+```
+GET /api/record/object/camera01/1718200000/manifest.mpd
+```
+Response: `200 OK` `application/dash+xml`
 ```xml
 <?xml version="1.0"?>
-<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" ...>
-  <!-- MPEG-DASH manifest content -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Period>
+    <AdaptationSet>
+      <Representation id="video">
+        <SegmentList>
+          <SegmentURL media="v_init.m4s"/>
+          <SegmentURL media="v_seg_0001.m4s"/>
+          <SegmentURL media="v_seg_0002.m4s"/>
+        </SegmentList>
+      </Representation>
+    </AdaptationSet>
+  </Period>
 </MPD>
 ```
 
-### Get Segment File
+### Start Recording (Manual)
 
-Proxy access to recorded segment files.
+`POST` `/api/record/{stream}`
 
-`GET` `/api/record/object/{path}`
+Manually start recording a stream through Liveman. Liveman will:
+1. Route the request to an available Live777 node (based on `node` query parameter or where the stream is currently published)
+2. Forward the request to that node's recorder API
+3. Store recording metadata in Liveman's database
 
-Path parameter: Storage path of the segment file (URL encoded)
+**Query Parameters:**
+- `node` (optional): Alias of specific Live777 node to route recording to. If omitted, uses the first node publishing this stream or the first available node.
 
-Response: [200] Binary media data or [302] redirect to storage URL
+**Request Body (optional):**
+```json
+{
+  "base_dir": "optional/custom/path"
+}
+```
+
+Parameters:
+- `base_dir` (optional): Override storage path prefix on the target Live777 node
+
+**Response:** `200 OK` `application/json`
+```json
+{
+  "started": true,
+  "mpd_path": "camera01/1718200000/manifest.mpd"
+}
+```
+
+### Recording Status
+
+`GET` `/api/record/{stream}`
+
+Check if any node in the cluster is currently recording this stream.
+
+**Response:** `200 OK` `application/json`
+```json
+{
+  "recording": true
+}
+```
+
+### Stop Recording
+
+`DELETE` `/api/record/{stream}`
+
+Stop recording of a stream on all nodes in the cluster that are recording it.
+
+**Response:** `200 OK` `application/json`
 
 ### Presign Upload URL
 
-Generate a presigned URL for uploading recording files (used by LiveIon).
-
 `POST` `/api/storage/presign_upload`
 
-Request Body:
+Generate a presigned upload URL for direct storage backend uploads (used by Live777 nodes for optimized recording sync).
+
+**Request Body:**
 ```json
 {
   "stream_id": "camera01",
-  "filename": "2025/07/24/init.m4s",
+  "filename": "2025/07/24/v_seg_0001.m4s",
   "method": "PUT"
 }
 ```
 
-Response: [200] `application/json`
+Parameters:
+- `stream_id`: Stream identifier
+- `filename`: Relative path within storage
+- `method`: HTTP method (`PUT` for uploads)
+
+**Response:** `200 OK` `application/json`
 ```json
 {
-  "url": "https://s3.region.amazonaws.com/bucket/recordings/camera01/2025/07/24/init.m4s?signature=...",
+  "url": "https://s3.region.amazonaws.com/bucket/camera01/2025/07/24/v_seg_0001.m4s?signature=...",
   "method": "PUT",
   "headers": {
     "Content-Type": "application/octet-stream"
@@ -99,24 +188,24 @@ Response: [200] `application/json`
 }
 ```
 
-### Sync Recording Index
-
-Synchronize recording index from LiveIon to LiveMan database.
+### Sync Recording Metadata
 
 `POST` `/api/record/sync`
 
-Request Body:
+Synchronize recording metadata from a Live777 node to Liveman's database. **Typically called automatically by Live777 nodes; rarely needs manual invocation.**
+
+**Request Body:**
 ```json
 {
   "stream_id": "camera01",
-  "start_time": 1721800000,
+  "start_time": 1718200000,
   "duration": 3600.0,
-  "path": "recordings/camera01/1721800000/manifest.mpd",
+  "path": "camera01/1718200000/manifest.mpd",
   "meta": {
-    "start_time": 1721800000,
-    "end_time": 1721803600,
+    "start_time": 1718200000,
+    "end_time": 1718203600,
     "duration": 3600.0,
-    "size": 123456789,
+    "size": 1234567890,
     "video_codec": "avc1.64001f",
     "audio_codec": "opus",
     "width": 1920,
@@ -125,7 +214,14 @@ Request Body:
 }
 ```
 
-Response: [200] `application/json`
+Fields:
+- `stream_id`: Stream name
+- `start_time`: Session start Unix timestamp
+- `duration`: Total session duration in seconds
+- `path`: Relative storage path to MPD manifest
+- `meta`: Recording metadata (codecs, resolution, size, etc.)
+
+**Response:** `200 OK` `application/json`
 ```json
 {
   "status": "ok"

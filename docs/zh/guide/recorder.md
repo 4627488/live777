@@ -4,19 +4,54 @@ liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 M
 
 ## 目前支持的编码 {#codec}
 
-| container  | video codecs                | audio codecs   |
+| 容器  | 视频编码                | 音频编码   |
 | -------- | --------------------------- | -------------- |
-| `Fragmented MP4`    | `H264`, `VP9`| `Opus`       |
+| `Fragmented MP4`    | `H264`, `VP9`, `H265`| `Opus`       |
 
-**Recorder 暂不支持 `VP8` 编码，因为 `VP8` 需要 `WebM` 容器。**
+**注意**：Recorder 暂不支持 `VP8` 编码，因为 `VP8` 需要 `WebM` 容器，与 Fragmented MP4 不兼容。
+
+## 自动录制 {#auto-recording}
+
+当配置了 `auto_streams` 模式时，Live777 会在匹配的流**上线**（首次收到发布者）时自动开始录制，在流**下线**（失去所有发布者）时停止录制。
+
+**示例：**
+```toml
+[recorder]
+auto_streams = ["*"]              # 录制所有流
+# auto_streams = ["camera*", "room-*"]  # 录制匹配模式的流
+```
+
+## 会话轮转 {#rotation}
+
+为了管理文件大小和存储效率，Live777 会自动轮转录制会话。当一个会话的累计时长达到 `max_recording_seconds` 时：
+
+1. 关闭当前的媒体分片（`v_seg_*.m4s`、`a_seg_*.m4s`）
+2. 完成当前会话的 MPD 清单
+3. 使用新的时间戳目录创建新会话
+4. 继续在新会话中录制
+
+**轮转行为：**
+- **禁用**：设置 `max_recording_seconds = 0` 可无限期录制而不轮转
+- **默认值**：`max_recording_seconds = 86400`（24 小时）
+- **检查间隔**：轮转检查每隔约最大时长的 10% 运行一次，以最小化延迟
+
+这确保了录制文件保持可管理的大小，同时保持持续的捕获能力。
 
 ## Liveman 集成 {#liveman}
 
-与 [Liveman](/zh/guide/liveman) 集成以实现集中式回放和代理访问：
+与 [Liveman](/zh/guide/liveman) 集成以实现集中式回放、录制元数据同步和代理访问：
 
-- 启动录制时 Live777 会返回存储元数据（`record_id`、`record_dir`、`mpd_path`）。当输出路径的最后一段不是 10 位 Unix 时间戳时，`record_id` 字段会返回为空字符串。
-- Liveman 使用 `record_id`/`record_dir` 与存储保持一致，再通过 `mpd_path` 回放
-- 媒体文件可通过 Liveman 代理获取：`GET /api/record/object/{path}`
+- **手动启动**：调用 Live777 节点上的 `POST /api/record/:streamId` 返回存储元数据（`record_id`、`record_dir`、`mpd_path`）
+- **元数据同步**：Live777 自动通过 `POST /api/record/sync` 将完成的录制元数据同步到 Liveman
+- **回放**：Liveman 维护所有录制的目录，并通过 `GET /api/record/object/{path}` 代理分片获取
+- **状态追踪**：通过 Liveman 的统一 API 查询录制状态和检索回放索引
+
+### 录制 ID
+
+`record_id` 字段是从输出路径中提取的 10 位 Unix 时间戳（秒）：
+- 使用默认路径时：`record_id` 自动填充为会话启动时的时间戳
+- 使用自定义 `base_dir` 时：除非路径以 10 位时间戳结尾，否则 `record_id` 为空
+- 示例：对于路径 `camera01/1718200000/`，`record_id` 为 `"1718200000"`
 
 ### 配置
 
@@ -27,7 +62,7 @@ node_alias = "live777-node-001"
 ```
 
 ::: tip 注意
-node_alias 是可选的，但在多节点部署中建议配置，以帮助 Liveman 识别录制元数据的来源。
+`node_alias` 是可选的，但在多节点部署中建议配置，以帮助 Liveman 识别录制元数据的来源，并正确路由请求到相应的 Live777 节点。
 :::
 
 ## 配置说明 {#config}
@@ -56,9 +91,10 @@ root = "./storage" # 录制文件根路径（默认："./storage"）
 
 #### 基础选项
 
-- `auto_streams`: 自动录制的流名称模式，支持通配符（默认：`[]` 空列表）
-- `max_recording_seconds`: 单个录制会话的最大持续时间（秒），超过即重新开一个录制（默认：`86400`，设为 `0` 禁用自动轮转）
-- `node_alias`: 可选的节点标识符，用于多节点部署（默认：不设置）
+- `auto_streams`: 自动录制的流名称模式。支持 `*` 和 `?` 通配符的通配模式（默认：`[]`—不自动录制）
+  - 示例：`["*"]`（所有流），`["camera*", "room-*"]`（基于模式）
+- `max_recording_seconds`: 单个录制会话的最大累计时长（秒），超过即自动轮转（默认：`86400` = 24 小时；设为 `0` 禁用自动轮转）
+- `node_alias`: 可选的节点标识符，用于多节点部署。由 Liveman 用来识别和追踪来自此节点的录制（默认：不设置）
 
 #### 存储选项
 
@@ -177,36 +213,138 @@ security_token = "..."
 
 ## 启动/状态 API {#api}
 
-需要启用 `recorder` 特性。
+需要在编译时启用 `recorder` 特性。
 
-- 启动录制: `POST` `/api/record/:streamId`
-  - 请求体（可选）: `{ "base_dir": "optional/path/prefix" }`
-  - 响应: `{ "id": ":streamId", "record_id": "<10位Unix时间戳或空字符串>", "record_dir": "<path>", "mpd_path": "<path>/manifest.mpd" }`
-- 录制状态: `GET` `/api/record/:streamId`
-  - 响应: `{ "recording": true }`
-- 停止录制: `DELETE` `/api/record/:streamId`
+### 启动录制
+
+**请求：**
+```
+POST /api/record/:streamId
+Content-Type: application/json
+
+{
+  "base_dir": "optional/custom/path"
+}
+```
+
+- `base_dir`（可选）：覆盖存储路径前缀。如果省略，Live777 使用 `/:streamId/:record_id/`，其中 `record_id` 是当前 Unix 时间戳
+
+**响应：** `200 OK`
+```json
+{
+  "id": "camera01",
+  "record_id": "1718200000",
+  "record_dir": "camera01/1718200000",
+  "mpd_path": "camera01/1718200000/manifest.mpd"
+}
+```
+
+### 录制状态
+
+**请求：**
+```
+GET /api/record/:streamId
+```
+
+**响应：** `200 OK`
+```json
+{
+  "recording": true
+}
+```
+
+返回 `true` 表示该流正在此节点上被录制。
+
+### 停止录制
+
+**请求：**
+```
+DELETE /api/record/:streamId
+```
+
+**响应：** `200 OK`（空响应体）
+
+停止指定流的活动录制会话。即使没有活动录制也返回成功。
 
 ## MPD 路径规则 {#mpd}
 
-- 默认 `record_dir`（未显式指定 `base_dir` 时）为 `/:streamId/:record_id/`，其中 `record_id` 是 10 位 Unix 时间戳。
-- 默认 MPD 位置： `/{record_dir}/manifest.mpd`。
-- 当单个录制会话累计时长达到 `max_recording_seconds` 时，Recorder 会关闭当前片段并以新的时间戳目录（如 `/:streamId/1718200000/`）继续录制，系统不会自动生成日历路径。
-- 当提供 `base_dir` 时，`record_dir` 与该值完全一致，Manifest 位于 `/{record_dir}/manifest.mpd`。若该值未以 10 位 Unix 时间戳结尾，响应中的 `record_id` 会是空字符串。
+### 默认路径
+
+当**未**提供 `base_dir` 时：
+- `record_dir`：`/:streamId/:record_id/`，其中 `record_id` 是会话启动时的 10 位 Unix 时间戳
+- MPD 位置：`/:streamId/:record_id/manifest.mpd`
+
+**示例：** `camera01/1718200000/manifest.mpd`（2024-06-12 19:00:00 UTC 启动的会话）
+
+### 自定义路径
+
+当**已**提供 `base_dir` 时：
+- `record_dir`：与 `base_dir` 值完全一致
+- MPD 位置：`/{base_dir}/manifest.mpd`
+- `record_id`：除非 `base_dir` 以 10 位时间戳结尾，否则为空字符串
+
+**示例：**
+- 输入：`base_dir = "recordings/mystream/2025-01-15"`
+- 输出：`record_dir = "recordings/mystream/2025-01-15"`，`record_id = ""`
+
+### 轮转路径
+
+当会话达到 `max_recording_seconds` 时：
+- 当前会话关闭
+- 使用新时间戳创建新目录：`/:streamId/:new_record_id/`
+- 不会自动创建日历风格的目录
+
+**示例：** 在会话 2 小时标记时轮转：
+```
+stream1/
+├── 1718200000/   （初始会话，约 2 小时）
+│   ├── manifest.mpd
+│   ├── v_init.m4s
+│   ├── v_seg_0001.m4s
+│   └── ...
+└── 1718207200/   （轮转后的新会话）
+    ├── manifest.mpd
+    └── ...
+```
 
 ## 文件组织结构 {#file-structure}
 
-录制文件会根据 `record_dir` 组织：
+录制文件在存储后端中按层级组织：
 
 ```
-records/
+{storage_root}/
 └── stream1/
-    └── 1762842203/
+    ├── 1762842203/                    # 会话 1（Unix 时间戳）
+    │   ├── manifest.mpd               # DASH 清单
+    │   ├── v_init.m4s                 # 视频初始化段
+    │   ├── a_init.m4s                 # 音频初始化段
+    │   ├── v_seg_0001.m4s             # 视频段 1
+    │   ├── a_seg_0001.m4s             # 音频段 1
+    │   ├── v_seg_0002.m4s
+    │   ├── a_seg_0002.m4s
+    │   └── ...
+    └── 1762845803/                    # 会话 2（轮转后）
         ├── manifest.mpd
         ├── v_init.m4s
         ├── a_init.m4s
-        ├── v_seg_0001.m4s
-        ├── a_seg_0001.m4s
         └── ...
 ```
 
-- 时间戳目录（如 `stream1/1762842203`）是 Live777 的唯一默认布局，也覆盖了 `max_recording_seconds` 触发的自动轮转。仅在非常明确的场景下才覆盖 `base_dir`，并留意这会让 `record_id` 变成空字符串。
+### 分片组织
+
+- **初始化段**：`v_init.m4s` 和 `a_init.m4s` 包含编码初始化数据
+- **媒体段**：`v_seg_NNNN.m4s`（视频）和 `a_seg_NNNN.m4s`（音频）按顺序编号
+- **清单**：`manifest.mpd` 是符合 DASH 标准的 MPD 文件，描述回放时间线
+
+### 存储路径
+
+- **基于时间戳的目录**（`stream/1762842203/`）是 Live777 生成的规范布局
+- **自动轮转**维持此布局；每个新会话都获得自己的时间戳目录
+- **自定义 `base_dir`**：如果提供，覆盖默认布局。仅在有特定组织需求时使用
+
+### 文件特性
+
+- 所有分片都是 **Fragmented MP4** 格式（ISO/IEC 14496-12:2015）
+- 每个分片都可独立寻址和解码
+- 典型分片时长：1-10 秒（每个编码可配置）
+- MPD 清单引用所有分片及其时序

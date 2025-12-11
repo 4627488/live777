@@ -172,21 +172,26 @@ Request:
 
 ## Recorder
 
+Recording and stream capture via Live777 node. **Requires `recorder` feature at compile time.**
+
 ### Start Recording a Stream
 
 `POST` `/api/record/:streamId`
 
 Starts recording the specified stream. The stream must be active (have a publisher) for recording to begin.
 
-Request Body (optional):
+**Request Body (optional):**
 
 ```json
-{ "base_dir": "optional/path/prefix" }
+{
+  "base_dir": "optional/custom/path"
+}
 ```
 
-- `base_dir` (optional): override the storage path prefix. If omitted, Live777 uses `/:streamId/:record_id/` where `record_id` is the current Unix timestamp. Once a session reaches `max_recording_seconds`, a new timestamp directory is created automatically.
+Parameters:
+- `base_dir` (optional): Override the storage path prefix. If omitted, Live777 uses `/:streamId/:record_id/` where `record_id` is the session start Unix timestamp. When a session reaches `max_recording_seconds` duration, a new timestamped directory is created automatically.
 
-Response: [200]
+**Response:** `200 OK`
 
 ```json
 {
@@ -197,23 +202,35 @@ Response: [200]
 }
 ```
 
-`record_id` is an empty string only when the recorder cannot infer a 10-digit Unix timestamp from the output path (for example, when a custom `base_dir` omits that suffix).
+Response Fields:
+- `id`: The stream identifier (same as `:streamId`)
+- `record_id`: 10-digit Unix timestamp extracted from the session path, or empty string if not inferable
+- `record_dir`: The relative storage path where recordings are saved
+- `mpd_path`: Absolute path to the DASH manifest file
 
-### Recording Status (by id)
+### Recording Status
 
 `GET` `/api/record/:streamId`
 
-Response: [200]
+Check whether a stream is currently being recorded on this Live777 node.
+
+**Response:** `200 OK`
 
 ```json
-{ "recording": true }
+{
+  "recording": true
+}
 ```
+
+Returns `true` if the stream is actively recording, `false` otherwise.
 
 ### Stop Recording
 
 `DELETE` `/api/record/:streamId`
 
-Stops an active recording session for the specified stream. Returns [200] with an empty body on success.
+Stops an active recording session for the specified stream.
 
-Reference: [Recorder](recorder)
+**Response:** `200 OK` (empty body)
+
+Returns success regardless of whether a recording was active. This is idempotent and safe to call multiple times.
 

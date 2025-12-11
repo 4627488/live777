@@ -172,23 +172,26 @@ Request:
 
 ## 录制
 
+Live777 节点的录制和流捕获功能。**需要在编译时启用 `recorder` 特性。**
+
 ### 开始录制流
 
 `POST` `/api/record/:streamId`
 
-开始录制指定的流。流必须处于活跃状态（有发布者）才能开始录制。需要启用 `recorder` 特性。
+开始录制指定的流。流必须处于活跃状态（有发布者）才能开始录制。
 
-请求体（可选）：
+**请求体（可选）：**
 
 ```json
 {
-  "base_dir": "optional/path/prefix"
+  "base_dir": "optional/custom/path"
 }
 ```
 
-- `base_dir`（可选）：覆盖默认的目录前缀。如果不设置，录制会使用 `/:streamId/:record_id/`（10 位 Unix 时间戳）作为目录；当单次录制时长达到 `max_recording_seconds` 时，系统会自动以新的时间戳目录继续录制。
+参数说明：
+- `base_dir`（可选）：覆盖默认的存储路径前缀。如果不设置，Live777 使用 `/:streamId/:record_id/`，其中 `record_id` 是会话启动时的 Unix 时间戳。当会话时长达到 `max_recording_seconds` 时，会自动创建新的时间戳目录。
 
-响应: [200]
+**响应：** `200 OK`
 
 ```json
 {
@@ -199,22 +202,34 @@ Request:
 }
 ```
 
-当输出路径末尾不是 10 位 Unix 时间戳（例如自定义 `base_dir` 未包含该段）时，`record_id` 会返回为空字符串。
+响应字段说明：
+- `id`：流标识符（与 `:streamId` 相同）
+- `record_id`：从会话路径中提取的 10 位 Unix 时间戳，如无法推断则为空字符串
+- `record_dir`：录制文件存储的相对路径
+- `mpd_path`：DASH 清单文件的绝对路径
 
 ### 录制状态
 
 `GET` `/api/record/:streamId`
 
-响应: [200]
+检查此 Live777 节点上是否正在录制该流。
+
+**响应：** `200 OK`
 
 ```json
-{ "recording": true }
+{
+  "recording": true
+}
 ```
+
+流正在录制时返回 `true`，否则返回 `false`。
 
 ### 停止录制
 
 `DELETE` `/api/record/:streamId`
 
-停止指定流的录制。成功时返回 [200]，响应体为空。
+停止指定流的录制会话。
 
-参考： [Recorder](recorder)
+**响应：** `200 OK`（空响应体）
+
+无论是否有活动录制，都返回成功。该操作是幂等的，可以安全地多次调用。
