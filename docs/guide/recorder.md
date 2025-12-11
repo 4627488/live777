@@ -209,60 +209,17 @@ access_key_secret = "..."
 security_token = "..."
 ```
 
-## Start/Status API {#api}
+## API Reference {#api}
 
-Requires `recorder` feature at compile time.
+For detailed API documentation on recording control and playback, see:
 
-### Start Recording
+- [Live777 API - Recorder](/guide/live777-api#recorder): Start, stop, and check recording status
+- [Live777 API - VOD](/guide/live777-api#recorder): Direct access to recorded files and indexes
+- [Liveman API - Recording & Playback](/guide/liveman-api#recording-playback): Centralized management for multi-node clusters
 
-**Request:**
-```
-POST /api/record/:streamId
-Content-Type: application/json
-
-{
-  "base_dir": "optional/custom/path"
-}
-```
-
-- `base_dir` (optional): Override the storage path prefix. If omitted, Live777 uses `/:streamId/:record_id/` where `record_id` is the current Unix timestamp
-
-**Response:** `200 OK`
-```json
-{
-  "id": "camera01",
-  "record_id": "1718200000",
-  "record_dir": "camera01/1718200000",
-  "mpd_path": "camera01/1718200000/manifest.mpd"
-}
-```
-
-### Recording Status
-
-**Request:**
-```
-GET /api/record/:streamId
-```
-
-**Response:** `200 OK`
-```json
-{
-  "recording": true
-}
-```
-
-Returns `true` if the stream is currently being recorded on this node.
-
-### Stop Recording
-
-**Request:**
-```
-DELETE /api/record/:streamId
-```
-
-**Response:** `200 OK` (empty body)
-
-Stops the active recording session for the specified stream. Returns success even if no recording is active.
+::: tip
+For single-node deployments, use Live777's built-in recording and VOD APIs. For multi-node clusters, use Liveman's centralized APIs for unified access across all nodes.
+:::
 
 ## MPD Path Conventions {#mpd}
 

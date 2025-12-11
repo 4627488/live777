@@ -233,3 +233,53 @@ Live777 节点的录制和流捕获功能。**需要在编译时启用 `recorder
 **响应：** `200 OK`（空响应体）
 
 无论是否有活动录制，都返回成功。该操作是幂等的，可以安全地多次调用。
+### 获取录制索引 (VOD)
+
+`GET` `/vod/:streamId/index`
+
+检索特定流的录制索引，列出所有可用的录制会话。
+
+**响应：** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "stream_id": "camera01",
+      "start_time": 1718200000,
+      "duration": 3600.0,
+      "path": "1718200000/",
+      "status": "LocalSaved"
+    }
+  ]
+}
+```
+
+如果该流没有录制，返回：
+```json
+{
+  "items": []
+}
+```
+
+### 获取录制文件 (VOD)
+
+`GET` `/vod/:streamId/:timestamp/:filename`
+
+检索特定的录制文件用于播放或下载。
+
+**路径参数：**
+- `streamId`：流标识符
+- `timestamp`：Unix 时间戳（10 位数字），标识录制会话
+- `filename`：要检索的文件名（例如 `manifest.mpd`、`v_init.m4s`、`v_seg_0001.m4s`）
+
+**响应：** `200 OK`
+
+返回请求的文件，带有适当的 Content-Type 头。响应包含 CORS 头（`Access-Control-Allow-Origin: *`）以支持浏览器播放。
+
+**示例：**
+```
+GET /vod/camera01/1718200000/manifest.mpd
+```
+
+返回用于播放的 DASH 清单。

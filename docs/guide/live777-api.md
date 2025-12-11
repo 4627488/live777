@@ -234,3 +234,54 @@ Stops an active recording session for the specified stream.
 
 Returns success regardless of whether a recording was active. This is idempotent and safe to call multiple times.
 
+### Get Recording Index (VOD)
+
+`GET` `/vod/:streamId/index`
+
+Retrieves the recording index for a specific stream, listing all available recording sessions.
+
+**Response:** `200 OK`
+
+```json
+{
+  "items": [
+    {
+      "stream_id": "camera01",
+      "start_time": 1718200000,
+      "duration": 3600.0,
+      "path": "1718200000/",
+      "status": "LocalSaved"
+    }
+  ]
+}
+```
+
+If no recordings exist for the stream, returns:
+```json
+{
+  "items": []
+}
+```
+
+### Get Recording File (VOD)
+
+`GET` `/vod/:streamId/:timestamp/:filename`
+
+Retrieves a specific recording file for playback or download.
+
+**Path Parameters:**
+- `streamId`: Stream identifier
+- `timestamp`: Unix timestamp (10-digit) identifying the recording session
+- `filename`: Name of the file to retrieve (e.g., `manifest.mpd`, `v_init.m4s`, `v_seg_0001.m4s`)
+
+**Response:** `200 OK`
+
+Returns the requested file with appropriate Content-Type header. The response includes CORS headers (`Access-Control-Allow-Origin: *`) for browser-based playback.
+
+**Example:**
+```
+GET /vod/camera01/1718200000/manifest.mpd
+```
+
+Returns the DASH manifest for playback.
+

@@ -211,60 +211,17 @@ access_key_secret = "..."
 security_token = "..."
 ```
 
-## 启动/状态 API {#api}
+## API 参考 {#api}
 
-需要在编译时启用 `recorder` 特性。
+有关录制控制和播放的详细 API 文档，请参阅：
 
-### 启动录制
+- [Live777 API - 录制](/zh/guide/live777-api#recorder)：启动、停止和检查录制状态
+- [Live777 API - VOD](/zh/guide/live777-api#recorder)：直接访问录制文件和索引
+- [Liveman API - 录制与回放](/zh/guide/liveman-api#recording-playback)：多节点集群的集中管理
 
-**请求：**
-```
-POST /api/record/:streamId
-Content-Type: application/json
-
-{
-  "base_dir": "optional/custom/path"
-}
-```
-
-- `base_dir`（可选）：覆盖存储路径前缀。如果省略，Live777 使用 `/:streamId/:record_id/`，其中 `record_id` 是当前 Unix 时间戳
-
-**响应：** `200 OK`
-```json
-{
-  "id": "camera01",
-  "record_id": "1718200000",
-  "record_dir": "camera01/1718200000",
-  "mpd_path": "camera01/1718200000/manifest.mpd"
-}
-```
-
-### 录制状态
-
-**请求：**
-```
-GET /api/record/:streamId
-```
-
-**响应：** `200 OK`
-```json
-{
-  "recording": true
-}
-```
-
-返回 `true` 表示该流正在此节点上被录制。
-
-### 停止录制
-
-**请求：**
-```
-DELETE /api/record/:streamId
-```
-
-**响应：** `200 OK`（空响应体）
-
-停止指定流的活动录制会话。即使没有活动录制也返回成功。
+::: tip 提示
+单节点部署使用 Live777 的内置录制和 VOD API。多节点集群使用 Liveman 的集中式 API，以实现跨所有节点的统一访问。
+:::
 
 ## MPD 路径规则 {#mpd}
 
