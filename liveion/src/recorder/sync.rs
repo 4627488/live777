@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, anyhow};
-use api::path;
 use futures::TryStreamExt;
 use opendal::{EntryMode, ErrorKind, Operator};
 use reqwest::{Client, Method, RequestBuilder};
@@ -106,11 +105,13 @@ impl SyncWorker {
         }
 
         let mut processed = 0usize;
-        for item in index.items.iter_mut() {
+        let mut i = 0;
+        while i < index.items.len() {
             if !matches!(
-                item.status,
+                index.items[i].status,
                 RecordingStatus::LocalSaved | RecordingStatus::Syncing
             ) {
+                i += 1;
                 continue;
             }
 
@@ -118,21 +119,28 @@ impl SyncWorker {
                 break;
             }
 
-            item.status = RecordingStatus::Syncing;
+            // Clone the item for processing to avoid borrow checker issues
+            let item_clone = index.items[i].clone();
+
+            index.items[i].status = RecordingStatus::Syncing;
             self.save_index(stream, &index).await?;
 
-            match self.sync_entry(stream, item).await {
+            match self.sync_entry(stream, &item_clone).await {
                 Ok(_) => {
-                    item.status = RecordingStatus::Synced;
+                    index.items[i].status = RecordingStatus::Synced;
                     processed += 1;
                 }
                 Err(err) => {
-                    tracing::warn!("[recorder] failed to sync {stream}/{}: {err:?}", item.path);
-                    item.status = RecordingStatus::LocalSaved;
+                    tracing::warn!(
+                        "[recorder] failed to sync {stream}/{}: {err:?}",
+                        item_clone.path
+                    );
+                    index.items[i].status = RecordingStatus::LocalSaved;
                 }
             }
 
             self.save_index(stream, &index).await?;
+            i += 1;
         }
 
         Ok(())
@@ -205,7 +213,7 @@ impl SyncWorker {
         }
 
         upload
-            .body(body)
+            .body(body.to_bytes())
             .send()
             .await?
             .error_for_status()
@@ -252,7 +260,7 @@ impl SyncWorker {
         let meta_path = format!("{stream}/{record_dir}/{META_FILENAME}");
         match self.operator.read(&meta_path).await {
             Ok(bytes) => {
-                let meta: RecordingMeta = serde_json::from_slice(&bytes)?;
+                let meta: RecordingMeta = serde_json::from_slice(&bytes.to_vec())?;
                 Ok(Some(meta))
             }
             Err(err) => {
@@ -269,7 +277,7 @@ impl SyncWorker {
         let index_path = format!("{stream}/{INDEX_FILENAME}");
         match self.operator.read(&index_path).await {
             Ok(bytes) => {
-                let idx: RecordingIndex = serde_json::from_slice(&bytes)?;
+                let idx: RecordingIndex = serde_json::from_slice(&bytes.to_vec())?;
                 Ok(Some(idx))
             }
             Err(err) => {

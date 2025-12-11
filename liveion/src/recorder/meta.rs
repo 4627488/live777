@@ -22,19 +22,14 @@ pub struct RecordingIndexItem {
     pub status: RecordingStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum RecordingStatus {
     Recording,
+    #[default]
     LocalSaved,
     Syncing,
     Synced,
     Purged,
-}
-
-impl Default for RecordingStatus {
-    fn default() -> Self {
-        RecordingStatus::LocalSaved
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
