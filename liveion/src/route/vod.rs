@@ -12,8 +12,8 @@ use axum::{Json, Router};
 
 pub fn route() -> Router<AppState> {
     Router::new()
-        .route("/vod/:stream/index", get(get_index))
-        .route("/vod/:stream/:timestamp/:filename", get(get_file))
+        .route("/{stream}/index", get(get_index))
+        .route("/{stream}/{timestamp}/{filename}", get(get_file))
 }
 
 #[cfg(feature = "recorder")]
