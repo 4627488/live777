@@ -54,6 +54,7 @@ scuffle-h265 = { version = "0.2.2", optional = true }
 
 glob = "0.3"
 url = { version = "2.5", optional = true }
+fs2 = "0.4"
 
 [features]
 webui = ["dep:rust-embed", "dep:mime_guess"]
