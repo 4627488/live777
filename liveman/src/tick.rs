@@ -413,8 +413,7 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
             }
 
             if should_advance {
-                let delete_url =
-                    format!("{}{}", server.url, api::path::recordings_delete());
+                let delete_url = format!("{}{}", server.url, api::path::recordings_delete());
                 let delete_req = DeleteRecordingsRequest {
                     records: ack_req.records,
                 };
