@@ -20,6 +20,17 @@ urls = [
 # Maximum duration in seconds before Live777 restarts a recording (0 disables auto-rotation)
 # max_recording_seconds = 86400
 
+# Async upload via Liveman presigned URLs
+[recorder.upload]
+# enabled = false
+# liveman_url = "http://127.0.0.1:8888"
+# liveman_token = "live777"
+# queue_path = "./recordings/upload_queue.jsonl"
+# local_dir = "./recordings"
+# presign_ttl_seconds = 300
+# interval_ms = 2000
+# concurrency = 2
+
 # Storage backend configuration (S3-only)
 [recorder.storage]
 type = "s3"

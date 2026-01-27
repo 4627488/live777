@@ -5,8 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use api::recorder::{
-    AckRecordingsRequest, DeleteRecordingsRequest, RecordingKey, RecordingSession,
-    RecordingStatus,
+    AckRecordingsRequest, DeleteRecordingsRequest, RecordingKey, RecordingSession, RecordingStatus,
 };
 use chrono::Utc;
 use fs2::FileExt;
@@ -60,12 +59,9 @@ impl RecordingsIndex {
                         if line.is_empty() {
                             continue;
                         }
-                        let entry: RecordingIndexEntry = serde_json::from_str(line)
-                            .with_context(|| {
-                                format!(
-                                    "Failed to parse index line in {}",
-                                    path.display()
-                                )
+                        let entry: RecordingIndexEntry =
+                            serde_json::from_str(line).with_context(|| {
+                                format!("Failed to parse index line in {}", path.display())
                             })?;
                         entries.insert(entry.key(), entry);
                     }
@@ -179,9 +175,7 @@ impl RecordingsIndex {
                 let map = self.entries.read().await;
                 records
                     .iter()
-                    .filter_map(|key| {
-                        map.get(&format!("{}/{}", key.stream, key.record)).cloned()
-                    })
+                    .filter_map(|key| map.get(&format!("{}/{}", key.stream, key.record)).cloned())
                     .collect::<Vec<_>>()
             };
             if !entries.is_empty() {
@@ -224,8 +218,7 @@ impl RecordingsIndex {
         let _guard = self.write_lock.lock().await;
         self.append_entries(entries.clone()).await?;
 
-        let count =
-            self.write_count.fetch_add(entries.len(), Ordering::Relaxed) + entries.len();
+        let count = self.write_count.fetch_add(entries.len(), Ordering::Relaxed) + entries.len();
         if count % 200 == 0 {
             self.compact().await?;
         }
