@@ -38,7 +38,7 @@ connect_timeout = 30
 
 ## Recording Index and Storage
 
-The recording system stores the index (date-based manifest location) in the database while keeping the actual media files in storage (filesystem, S3, OSS, etc.).
+The recording system stores the index (date-based manifest location) in the database while keeping the actual media files in S3 storage.
 
 ### Recording Index Schema
 

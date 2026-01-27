@@ -1,6 +1,6 @@
 # Recorder
 
-The Recorder in liveion is an optional feature that automatically records live streams into MP4 fragments and saves them locally or to the cloud. The `recorder` feature must be enabled at compile time.
+The Recorder in liveion is an optional feature that automatically records live streams into MP4 fragments and saves them to S3 storage. The `recorder` feature must be enabled at compile time.
 
 ## Supported Codecs {#codec}
 
@@ -46,10 +46,12 @@ max_recording_seconds = 86_400
 # Optional: Node alias for multi-node deployments
 node_alias = "live777-node-001"
 
-# Storage backend configuration
+# Storage backend configuration (S3-only)
 [recorder.storage]
-type = "fs"          # Storage type: "fs", "s3", or "oss"
-root = "./storage"   # Root path for recordings (default: "./storage")
+type = "s3"          # Storage type: "s3" only
+bucket = "my-live777-bucket"
+root = "/recordings"
+region = "us-east-1"
 ```
 
 ### Configuration Options
@@ -60,12 +62,7 @@ root = "./storage"   # Root path for recordings (default: "./storage")
 - `max_recording_seconds`: Maximum duration (seconds) for a single recording session before rotation (default: `86400`, set to `0` to disable auto-rotation)
 - `node_alias`: Optional node identifier for multi-node deployments (default: not set)
 
-#### Storage Options
-
-**File System (fs):**
-
-- `type`: Must be `"fs"`
-- `root`: Root directory path (default: `"./storage"`)
+#### Storage Options (S3-only)
 
 **S3 Backend:**
 
@@ -80,26 +77,7 @@ root = "./storage"   # Root path for recordings (default: "./storage")
 - `disable_config_load`: Set to `true` to disable automatic credential loading from environment/config files (default: `false`)
 - `enable_virtual_host_style`: Enable virtual-hosted-style requests, e.g., `bucket.endpoint.com` instead of `endpoint.com/bucket` (default: `false`)
 
-**OSS Backend:**
-
-- `type`: Must be `"oss"`
-- `bucket`: OSS bucket name (required)
-- `root`: Root path within bucket (default: `"/"`)
-- `region`: OSS region identifier, e.g., `"oss-cn-hangzhou"` (required)
-- `endpoint`: OSS endpoint URL, e.g., `"https://oss-cn-hangzhou.aliyuncs.com"` (required)
-- `access_key_id`: Alibaba Cloud access key ID (optional, can be loaded from environment)
-- `access_key_secret`: Alibaba Cloud access key secret (optional, can be loaded from environment)
-- `security_token`: Security token for STS temporary credentials (optional)
-
-## Storage Backends {#storage}
-
-### Local File System
-
-```toml
-[recorder.storage]
-type = "fs"
-root = "./storage"  # Or absolute path like "/var/lib/live777/recordings"
-```
+## Storage Backend (S3-only) {#storage}
 
 ### AWS S3
 
@@ -149,31 +127,6 @@ secret_access_key = "minioadmin"
 enable_virtual_host_style = false
 ```
 
-### Alibaba Cloud OSS
-
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "your-access-key"
-access_key_secret = "your-access-secret"
-```
-
-For STS temporary credentials:
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "STS..."
-access_key_secret = "..."
-security_token = "..."
-```
 
 ## Start/Status API {#api}
 

@@ -1,6 +1,6 @@
 # Recorder
 
-liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到本地或云。需要在编译时启用 `recorder` 特性。
+liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到 S3 存储。需要在编译时启用 `recorder` 特性。
 
 ## 目前支持的编码 {#codec}
 
@@ -46,10 +46,12 @@ max_recording_seconds = 86_400
 # 可选：多节点部署的节点别名
 node_alias = "live777-node-001"
 
-# 存储后端配置
+# 存储后端配置（仅 S3）
 [recorder.storage]
-type = "fs"        # 存储类型: "fs"、"s3" 或 "oss"
-root = "./storage" # 录制文件根路径（默认："./storage"）
+type = "s3"        # 存储类型仅支持 "s3"
+bucket = "my-live777-bucket"
+root = "/recordings"
+region = "us-east-1"
 ```
 
 ### 配置选项
@@ -60,12 +62,7 @@ root = "./storage" # 录制文件根路径（默认："./storage"）
 - `max_recording_seconds`: 单个录制会话的最大持续时间（秒），超过即重新开一个录制（默认：`86400`，设为 `0` 禁用自动轮转）
 - `node_alias`: 可选的节点标识符，用于多节点部署（默认：不设置）
 
-#### 存储选项
-
-**文件系统 (fs)：**
-
-- `type`: 必须为 `"fs"`
-- `root`: 根目录路径（默认：`"./storage"`）
+#### 存储选项（仅 S3）
 
 **S3 后端：**
 
@@ -80,26 +77,7 @@ root = "./storage" # 录制文件根路径（默认："./storage"）
 - `disable_config_load`: 设为 `true` 禁用从环境/配置文件自动加载凭证（默认：`false`）
 - `enable_virtual_host_style`: 启用虚拟主机样式请求，如 `bucket.endpoint.com` 而非 `endpoint.com/bucket`（默认：`false`）
 
-**OSS 后端：**
-
-- `type`: 必须为 `"oss"`
-- `bucket`: OSS 存储桶名称（必需）
-- `root`: 存储桶内的根路径（默认：`"/"`）
-- `region`: OSS 区域标识符，如 `"oss-cn-hangzhou"`（必需）
-- `endpoint`: OSS 端点 URL，如 `"https://oss-cn-hangzhou.aliyuncs.com"`（必需）
-- `access_key_id`: 阿里云访问密钥 ID（可选，可从环境加载）
-- `access_key_secret`: 阿里云访问密钥 Secret（可选，可从环境加载）
-- `security_token`: STS 临时凭证的安全令牌（可选）
-
-## 存储后端 {#storage}
-
-### 本地文件系统
-
-```toml
-[recorder.storage]
-type = "fs"
-root = "./storage"  # 或使用绝对路径如 "/var/lib/live777/recordings"
-```
+## 存储后端（仅 S3） {#storage}
 
 ### AWS S3
 
@@ -149,31 +127,6 @@ secret_access_key = "minioadmin"
 enable_virtual_host_style = false
 ```
 
-### 阿里云 OSS
-
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "your-access-key"
-access_key_secret = "your-access-secret"
-```
-
-使用 STS 临时凭证：
-```toml
-[recorder.storage]
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/recordings"
-region = "oss-cn-hangzhou"
-endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-access_key_id = "STS..."
-access_key_secret = "..."
-security_token = "..."
-```
 
 ## 启动/状态 API {#api}
 

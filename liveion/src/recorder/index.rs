@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use api::recorder::{AckRecordingsRequest, RecordingKey, RecordingSession, RecordingStatus};
+use api::recorder::{
+    AckRecordingsRequest, DeleteRecordingsRequest, RecordingKey, RecordingSession,
+    RecordingStatus,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, RwLock};
@@ -128,6 +131,7 @@ impl RecordingsIndex {
             rows.retain(|r| r.updated_at > since);
         }
 
+        rows.retain(|r| !matches!(r.status, RecordingStatus::Acked));
         rows.sort_by(|a, b| a.updated_at.cmp(&b.updated_at));
         if rows.len() > limit {
             rows.truncate(limit);
@@ -151,12 +155,36 @@ impl RecordingsIndex {
     }
 
     pub async fn ack(&self, req: AckRecordingsRequest) -> Result<usize> {
+        let mut acked = 0usize;
+        {
+            let mut map = self.entries.write().await;
+            for RecordingKey { stream, record } in req.records {
+                let key = format!("{}/{}", stream, record);
+                if let Some(entry) = map.get_mut(&key) {
+                    entry.status = RecordingStatus::Acked;
+                    entry.updated_at = Utc::now().timestamp_micros();
+                    acked += 1;
+                }
+            }
+        }
+
+        if acked > 0 {
+            self.persist().await?;
+        }
+
+        Ok(acked)
+    }
+
+    pub async fn delete_acked(&self, req: DeleteRecordingsRequest) -> Result<usize> {
         let mut removed = 0usize;
         {
             let mut map = self.entries.write().await;
             for RecordingKey { stream, record } in req.records {
                 let key = format!("{}/{}", stream, record);
-                if map.remove(&key).is_some() {
+                if let Some(entry) = map.get(&key)
+                    && matches!(entry.status, RecordingStatus::Acked)
+                {
+                    map.remove(&key);
                     removed += 1;
                 }
             }
