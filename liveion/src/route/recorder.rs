@@ -18,8 +18,7 @@ pub fn route() -> Router<AppState> {
         .route(api::path::recordings(), post(pull_recordings))
         .route(api::path::recordings_ack(), post(ack_recordings))
         .route(api::path::recordings_delete(), post(delete_recordings))
-}
-
+    }
 #[cfg(feature = "recorder")]
 async fn record_stream(
     State(state): State<AppState>,
