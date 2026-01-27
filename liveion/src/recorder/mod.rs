@@ -14,8 +14,8 @@ use storage::init_operator;
 use crate::hook::{Event, StreamEventType};
 use crate::stream::manager::Manager;
 use api::recorder::{
-    AckRecordingsRequest, AckRecordingsResponse, PullRecordingsRequest, PullRecordingsResponse,
-    RecordingStatus,
+    AckRecordingsRequest, AckRecordingsResponse, DeleteRecordingsRequest,
+    DeleteRecordingsResponse, PullRecordingsRequest, PullRecordingsResponse, RecordingStatus,
 };
 use chrono::Utc;
 
@@ -268,11 +268,22 @@ pub async fn pull_recordings(req: PullRecordingsRequest) -> anyhow::Result<PullR
 
 pub async fn ack_recordings(req: AckRecordingsRequest) -> anyhow::Result<AckRecordingsResponse> {
     let Some(index) = get_index().await else {
-        return Ok(AckRecordingsResponse { deleted: 0 });
+        return Ok(AckRecordingsResponse { acked: 0 });
     };
 
-    let deleted = index.ack(req).await?;
-    Ok(AckRecordingsResponse { deleted })
+    let acked = index.ack(req).await?;
+    Ok(AckRecordingsResponse { acked })
+}
+
+pub async fn delete_recordings(
+    req: DeleteRecordingsRequest,
+) -> anyhow::Result<DeleteRecordingsResponse> {
+    let Some(index) = get_index().await else {
+        return Ok(DeleteRecordingsResponse { deleted: 0 });
+    };
+
+    let deleted = index.delete_acked(req).await?;
+    Ok(DeleteRecordingsResponse { deleted })
 }
 
 fn record_key(info: &RecordingInfo) -> String {
@@ -291,10 +302,7 @@ fn resolve_index_path(cfg: &RecorderConfig) -> Option<PathBuf> {
         return Some(PathBuf::from(path));
     }
 
-    match &cfg.storage {
-        storage::StorageConfig::Fs { root } => Some(PathBuf::from(root).join("index.json")),
-        _ => Some(PathBuf::from("./recordings/index.json")),
-    }
+    Some(PathBuf::from("./recordings/index.json"))
 }
 
 #[cfg(feature = "recorder")]

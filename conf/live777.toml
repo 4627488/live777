@@ -20,34 +20,19 @@ urls = [
 # Maximum duration in seconds before Live777 restarts a recording (0 disables auto-rotation)
 # max_recording_seconds = 86400
 
-# Storage backend configuration
+# Storage backend configuration (S3-only)
 [recorder.storage]
-# Local filesystem (default)
-type = "fs"
-root = "./records"
+type = "s3"
+bucket = "my-live777-bucket"
+root = "/recordings"
+region = "us-east-1"
 
-# AWS S3 with explicit credentials
-#type = "s3"
-#bucket = "my-live777-bucket"
-#root = "/recordings"
-#region = "us-east-1"
+# Optional: explicit credentials
 #access_key_id = "AKIAIOSFODNN7EXAMPLE"
 #secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
-# AWS S3 with IAM role (recommended for EC2/ECS)
-#type = "s3"
-#bucket = "my-live777-bucket"
-#root = "/recordings"
-#region = "us-east-1"
-
-# Alibaba Cloud OSS
-#type = "oss"
-#bucket = "my-oss-bucket"
-#root = "/recordings"
-#region = "oss-cn-hangzhou"
-#endpoint = "https://oss-cn-hangzhou.aliyuncs.com"
-#access_key_id = "your-access-key"
-#access_key_secret = "your-access-secret"    
+# Optional: custom endpoint for S3-compatible storage
+#endpoint = "http://localhost:9000"
 
 # [[ice_servers]]
 # urls = [ "turn:turn.22333.fun", "turn:cn.22333.fun" ]

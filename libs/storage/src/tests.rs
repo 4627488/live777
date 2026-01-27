@@ -1,16 +1,6 @@
 use crate::{StorageConfig, create_operator};
 
 #[tokio::test]
-async fn test_fs_storage_config() {
-    let config = StorageConfig::Fs {
-        root: "./test_records".to_string(),
-    };
-
-    let result = create_operator(&config);
-    assert!(result.is_ok(), "Failed to create FS storage operator");
-}
-
-#[tokio::test]
 async fn test_s3_storage_config() {
     let config = StorageConfig::S3 {
         bucket: "test-bucket".to_string(),
@@ -26,22 +16,6 @@ async fn test_s3_storage_config() {
 
     let result = create_operator(&config);
     assert!(result.is_ok(), "Failed to create S3 storage operator");
-}
-
-#[tokio::test]
-async fn test_oss_storage_config() {
-    let config = StorageConfig::Oss {
-        bucket: "test-bucket".to_string(),
-        root: "/test".to_string(),
-        region: "oss-cn-hangzhou".to_string(),
-        endpoint: "https://oss-cn-hangzhou.aliyuncs.com".to_string(),
-        access_key_id: Some("test-key".to_string()),
-        access_key_secret: Some("test-secret".to_string()),
-        security_token: None,
-    };
-
-    let result = create_operator(&config);
-    assert!(result.is_ok(), "Failed to create OSS storage operator");
 }
 
 #[test]
@@ -75,10 +49,10 @@ fn test_default_storage_config() {
     let config = StorageConfig::default();
 
     match config {
-        StorageConfig::Fs { root } => {
-            assert_eq!(root, "./storage");
+        StorageConfig::S3 { bucket, root, .. } => {
+            assert_eq!(bucket, "");
+            assert_eq!(root, "/");
         }
-        _ => panic!("Default storage should be FS"),
     }
 }
 
@@ -110,53 +84,5 @@ enable_virtual_host_style = true
             assert!(enable_virtual_host_style);
         }
         _ => panic!("Expected S3 storage config"),
-    }
-}
-
-#[test]
-fn test_oss_config_parsing() {
-    let toml_str = r#"
-type = "oss"
-bucket = "my-oss-bucket"
-root = "/data"
-region = "oss-cn-beijing"
-endpoint = "https://oss-cn-beijing.aliyuncs.com"
-access_key_id = "LTAI..."
-access_key_secret = "secret..."
-"#;
-
-    let config: StorageConfig = toml::from_str(toml_str).expect("Failed to parse OSS TOML config");
-
-    match config {
-        StorageConfig::Oss {
-            bucket,
-            root,
-            region,
-            endpoint,
-            ..
-        } => {
-            assert_eq!(bucket, "my-oss-bucket");
-            assert_eq!(root, "/data");
-            assert_eq!(region, "oss-cn-beijing");
-            assert_eq!(endpoint, "https://oss-cn-beijing.aliyuncs.com");
-        }
-        _ => panic!("Expected OSS storage config"),
-    }
-}
-
-#[test]
-fn test_fs_config_parsing() {
-    let toml_str = r#"
-type = "fs"
-root = "/custom/path"
-"#;
-
-    let config: StorageConfig = toml::from_str(toml_str).expect("Failed to parse FS TOML config");
-
-    match config {
-        StorageConfig::Fs { root } => {
-            assert_eq!(root, "/custom/path");
-        }
-        _ => panic!("Expected FS storage config"),
     }
 }
