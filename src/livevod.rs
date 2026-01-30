@@ -195,8 +195,9 @@ async fn get_object(
         match state.operator.presign_read(&path, ttl).await {
             Ok(req) => {
                 let uri = req.uri().to_string();
-                return Ok((StatusCode::TEMPORARY_REDIRECT, [(header::LOCATION, uri)])
-                    .into_response());
+                return Ok(
+                    (StatusCode::TEMPORARY_REDIRECT, [(header::LOCATION, uri)]).into_response()
+                );
             }
             Err(e) => {
                 tracing::error!("presign read failed for '{}': {}", path, e);
@@ -217,7 +218,11 @@ async fn get_object(
             } else {
                 "application/octet-stream"
             };
-            Ok((StatusCode::OK, [("content-type", content_type)], bytes.to_vec())
+            Ok((
+                StatusCode::OK,
+                [("content-type", content_type)],
+                bytes.to_vec(),
+            )
                 .into_response())
         }
         Err(e) => {

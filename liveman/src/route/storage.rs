@@ -1,11 +1,11 @@
+#[cfg(feature = "recorder")]
+use axum::http::StatusCode;
 use axum::{
     Router,
     extract::State,
     response::{Json, Response},
     routing::post,
 };
-#[cfg(feature = "recorder")]
-use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -30,7 +30,10 @@ pub fn route() -> Router<AppState> {
     Router::new().route("/api/storage/presign", post(presign))
 }
 
-async fn presign(State(state): State<AppState>, Json(req): Json<PresignRequest>) -> Result<Response> {
+async fn presign(
+    State(state): State<AppState>,
+    Json(req): Json<PresignRequest>,
+) -> Result<Response> {
     #[cfg(feature = "recorder")]
     {
         let Some(ref operator) = state.file_storage else {
