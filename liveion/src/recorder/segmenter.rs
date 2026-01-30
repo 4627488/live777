@@ -849,15 +849,15 @@ impl Segmenter {
             let stream_clone = self.stream.clone();
             let path_clone = path.clone();
             tokio::spawn(async move {
-                if let Some(parent) = local_path.parent() {
-                    if let Err(e) = tokio::fs::create_dir_all(parent).await {
-                        tracing::warn!(
-                            "[segmenter] failed to create local dir for {}: {}",
-                            path_clone,
-                            e
-                        );
-                        return;
-                    }
+                if let Some(parent) = local_path.parent()
+                    && let Err(e) = tokio::fs::create_dir_all(parent).await
+                {
+                    tracing::warn!(
+                        "[segmenter] failed to create local dir for {}: {}",
+                        path_clone,
+                        e
+                    );
+                    return;
                 }
                 if let Err(e) = tokio::fs::write(&local_path, data).await {
                     tracing::warn!(

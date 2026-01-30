@@ -289,22 +289,20 @@ impl PeerForward {
     #[cfg(feature = "recorder")]
     pub async fn first_audio_track_info(&self) -> Option<AudioTrackInfo> {
         let tracks = self.internal.publish_tracks.read().await;
-        tracks
-            .iter()
-            .find(|track| track.kind() == RTPCodecType::Audio)
-            .and_then(|track| match track {
-                track::PublishTrackRemote::Real { track, .. } => {
-                    let params = track.codec();
-                    Some(AudioTrackInfo {
-                        clock_rate: params.capability.clock_rate,
-                        channels: params.capability.channels,
-                        codec_mime: params.capability.mime_type.clone(),
-                        fmtp: params.capability.sdp_fmtp_line.clone(),
-                    })
-                }
-                #[cfg(feature = "source")]
-                _ => None,
-            })
+        tracks.iter().find_map(|track| match track {
+            track::PublishTrackRemote::Real { track, .. }
+                if track.kind() == RTPCodecType::Audio =>
+            {
+                let params = track.codec();
+                Some(AudioTrackInfo {
+                    clock_rate: params.capability.clock_rate,
+                    channels: params.capability.channels,
+                    codec_mime: params.capability.mime_type.clone(),
+                    fmtp: params.capability.sdp_fmtp_line.clone(),
+                })
+            }
+            _ => None,
+        })
     }
 
     #[cfg(feature = "recorder")]
