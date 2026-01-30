@@ -7,6 +7,7 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
+use axum_extra::extract::Query;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
@@ -133,6 +134,7 @@ async fn main() {
     let app = Router::new()
         .route("/api/playback", get(list_streams))
         .route("/api/playback/{stream}", get(list_records))
+        .route("/api/playback/{stream}/at", get(find_record_at))
         .route("/api/record/object/{*path}", get(get_object))
         .with_state(state);
 
@@ -182,6 +184,45 @@ async fn list_records(
         .collect();
     records.sort_by(|a, b| a.record.cmp(&b.record));
     Ok(Json(records))
+}
+
+#[derive(Deserialize)]
+struct TimeQuery {
+    ts: i64,
+}
+
+async fn find_record_at(
+    State(state): State<AppState>,
+    Path(stream): Path<String>,
+    Query(query): Query<TimeQuery>,
+) -> Result<Json<RecordingIndexEntry>, Response> {
+    let ts_micros = normalize_ts_to_micros(query.ts);
+    let entries = load_index(&state.config.index_path).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("failed to load index: {e}"),
+        )
+            .into_response()
+    })?;
+
+    let record = entries.into_iter().find(|entry| {
+        if entry.stream != stream {
+            return false;
+        }
+        let start = entry.start_ts;
+        let end = entry
+            .end_ts
+            .or_else(|| entry.duration_ms.map(|d| start + (d as i64) * 1000));
+        match end {
+            Some(end) => ts_micros >= start && ts_micros <= end,
+            None => ts_micros >= start,
+        }
+    });
+
+    match record {
+        Some(record) => Ok(Json(record)),
+        None => Err((StatusCode::NOT_FOUND, "record not found").into_response()),
+    }
 }
 
 async fn get_object(
@@ -254,4 +295,14 @@ async fn load_index(path: &str) -> Result<Vec<RecordingIndexEntry>> {
         entries.push(entry);
     }
     Ok(entries)
+}
+
+fn normalize_ts_to_micros(ts: i64) -> i64 {
+    if ts > 1_000_000_000_000_000 {
+        ts
+    } else if ts > 1_000_000_000_000 {
+        ts * 1000
+    } else {
+        ts * 1_000_000
+    }
 }

@@ -2463,6 +2463,7 @@ dependencies = [
  "anyhow",
  "api",
  "axum 0.8.6",
+ "axum-extra",
  "clap",
  "cli",
  "http 1.4.0",

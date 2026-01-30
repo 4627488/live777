@@ -39,6 +39,7 @@ pub struct UploadManager {
     entries: RwLock<HashMap<String, UploadEntry>>,
     write_lock: Mutex<()>,
     semaphore: Semaphore,
+    last_ping_fail: Mutex<i64>,
 }
 
 impl UploadManager {
@@ -65,6 +66,7 @@ impl UploadManager {
             entries: RwLock::new(entries),
             write_lock: Mutex::new(()),
             semaphore: Semaphore::new(concurrency),
+            last_ping_fail: Mutex::new(0),
         })
     }
 
@@ -98,6 +100,9 @@ impl UploadManager {
     }
 
     async fn process_queue(self: &std::sync::Arc<Self>) -> Result<()> {
+        if !self.is_liveman_available().await? {
+            return Ok(());
+        }
         let now = chrono::Utc::now().timestamp_millis();
         let entries: Vec<UploadEntry> = {
             let map = self.entries.read().await;
@@ -177,6 +182,46 @@ impl UploadManager {
             return Err(anyhow::anyhow!("presign failed: {}", resp.status()));
         }
         Ok(resp.json::<PresignResponse>().await?)
+    }
+
+    async fn is_liveman_available(&self) -> Result<bool> {
+        if self.cfg.liveman_url.trim().is_empty() {
+            return Ok(false);
+        }
+        let now = chrono::Utc::now().timestamp_millis();
+        let mut last_fail = self.last_ping_fail.lock().await;
+        if *last_fail != 0 && now - *last_fail < 5_000 {
+            return Ok(false);
+        }
+
+        let url = format!(
+            "{}/api/storage/ping",
+            self.cfg.liveman_url.trim_end_matches('/')
+        );
+        let mut req = self.client.get(url);
+        if !self.cfg.liveman_token.is_empty() {
+            req = req.header(
+                header::AUTHORIZATION,
+                format!("Bearer {}", self.cfg.liveman_token),
+            );
+        }
+
+        match req.send().await {
+            Ok(resp) if resp.status().is_success() => {
+                *last_fail = 0;
+                Ok(true)
+            }
+            Ok(resp) => {
+                *last_fail = now;
+                warn!("[uploader] liveman ping failed: {}", resp.status());
+                Ok(false)
+            }
+            Err(e) => {
+                *last_fail = now;
+                warn!("[uploader] liveman ping error: {}", e);
+                Ok(false)
+            }
+        }
     }
 
     async fn update_entry(&self, entry: UploadEntry) -> Result<()> {

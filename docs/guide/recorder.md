@@ -139,6 +139,15 @@ Requires `recorder` feature.
   - Response: `{ "recording": true }`
 - Stop recording: `DELETE` `/api/record/:streamId`
 
+### Recording Index Sync APIs
+
+- Pull sessions: `POST` `/api/recordings`
+  - Body: `{ "stream": "optional", "since_ts": 0, "limit": 200 }`
+- ACK sessions: `POST` `/api/recordings/ack`
+  - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
+- Delete ACKed sessions: `POST` `/api/recordings/delete`
+  - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
+
 ## MPD Path Conventions {#mpd}
 
 - Default `record_dir` (when `base_dir` is not provided): `/:streamId/:record_id/` where `record_id` is a 10-digit Unix timestamp (seconds).
@@ -163,3 +172,19 @@ records/
 ```
 
 - Timestamp-based folders (`stream/1762842203`) are the canonical layout produced by Live777, including automatic rotations triggered by `max_recording_seconds`. Provide a custom `base_dir` only if you intentionally need a different structure and accept the impact on `record_id` values.
+
+## Async Upload (Presigned URLs)
+
+Enable async uploads via Liveman presign API and local spool:
+
+```toml
+[recorder.upload]
+enabled = true
+liveman_url = "http://127.0.0.1:8888"
+liveman_token = "live777"
+queue_path = "./recordings/upload_queue.jsonl"
+local_dir = "./recordings"
+presign_ttl_seconds = 300
+interval_ms = 2000
+concurrency = 2
+```
