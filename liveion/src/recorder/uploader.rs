@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -38,7 +39,7 @@ pub struct UploadManager {
     client: Client,
     entries: RwLock<HashMap<String, UploadEntry>>,
     write_lock: Mutex<()>,
-    semaphore: Semaphore,
+    semaphore: Arc<Semaphore>,
     last_ping_fail: Mutex<i64>,
 }
 
@@ -65,7 +66,7 @@ impl UploadManager {
             client,
             entries: RwLock::new(entries),
             write_lock: Mutex::new(()),
-            semaphore: Semaphore::new(concurrency),
+            semaphore: Arc::new(Semaphore::new(concurrency)),
             last_ping_fail: Mutex::new(0),
         })
     }
@@ -93,13 +94,13 @@ impl UploadManager {
         let interval = Duration::from_millis(self.cfg.interval_ms.max(500));
         loop {
             tokio::time::sleep(interval).await;
-            if let Err(e) = self.process_queue().await {
+            if let Err(e) = self.clone().process_queue().await {
                 warn!("[uploader] queue processing failed: {}", e);
             }
         }
     }
 
-    async fn process_queue(self: &std::sync::Arc<Self>) -> Result<()> {
+    async fn process_queue(self: std::sync::Arc<Self>) -> Result<()> {
         if !self.is_liveman_available().await? {
             return Ok(());
         }
@@ -107,8 +108,8 @@ impl UploadManager {
         let entries: Vec<UploadEntry> = {
             let map = self.entries.read().await;
             map.values()
-                .cloned()
                 .filter(|entry| entry.next_retry_at <= now)
+                .cloned()
                 .collect()
         };
 
@@ -117,7 +118,7 @@ impl UploadManager {
         }
 
         for entry in entries {
-            let permit = self.semaphore.acquire().await?;
+            let permit = self.semaphore.clone().acquire_owned().await?;
             let this = self.clone();
             tokio::spawn(async move {
                 let _permit = permit;

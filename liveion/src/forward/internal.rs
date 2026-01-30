@@ -471,14 +471,14 @@ impl PeerForwardInternal {
         &self,
     ) -> Option<Arc<webrtc::track::track_remote::TrackRemote>> {
         let publish_tracks = self.publish_tracks.read().await;
-        publish_tracks
-            .iter()
-            .find(|track| track.kind() == webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video)
-            .and_then(|track| match track {
-                PublishTrackRemote::Real { track, .. } => Some(track.clone()),
-                #[cfg(feature = "source")]
-                _ => None,
-            })
+        publish_tracks.iter().find_map(|track| match track {
+            PublishTrackRemote::Real { track, .. }
+                if track.kind() == webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video =>
+            {
+                Some(track.clone())
+            }
+            _ => None,
+        })
     }
 
     #[cfg(feature = "recorder")]

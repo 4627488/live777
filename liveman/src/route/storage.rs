@@ -3,13 +3,15 @@ use axum::http::StatusCode;
 use axum::{
     Router,
     extract::State,
-    response::{Json, Response},
+    response::{IntoResponse, Json, Response},
     routing::post,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{AppState, error::AppError, result::Result};
+#[cfg(not(feature = "recorder"))]
+use crate::error::AppError;
+use crate::{AppState, result::Result};
 
 #[cfg_attr(not(feature = "recorder"), allow(dead_code))]
 #[derive(Debug, Deserialize)]
@@ -36,9 +38,10 @@ async fn ping(State(state): State<AppState>) -> Result<Response> {
     #[cfg(feature = "recorder")]
     {
         if state.file_storage.is_some() {
-            return Ok((StatusCode::OK, "ok").into_response());
+            Ok((StatusCode::OK, "ok").into_response())
+        } else {
+            Ok((StatusCode::SERVICE_UNAVAILABLE, "storage not configured").into_response())
         }
-        return Ok((StatusCode::SERVICE_UNAVAILABLE, "storage not configured").into_response());
     }
 
     #[cfg(not(feature = "recorder"))]

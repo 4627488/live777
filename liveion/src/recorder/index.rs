@@ -219,7 +219,7 @@ impl RecordingsIndex {
         self.append_entries(entries.clone()).await?;
 
         let count = self.write_count.fetch_add(entries.len(), Ordering::Relaxed) + entries.len();
-        if count % 200 == 0 {
+        if count.is_multiple_of(200) {
             self.compact().await?;
         }
         Ok(())
@@ -312,6 +312,7 @@ fn lock_file(path: &Path) -> Result<std::fs::File> {
     let file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&lock_path)?;
     file.lock_exclusive()?;
     Ok(file)
@@ -328,10 +329,10 @@ fn lock_path_for(path: &Path) -> PathBuf {
 }
 
 fn sync_parent_dir(path: &Path) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        if let Ok(dir) = std::fs::File::open(parent) {
-            let _ = dir.sync_all();
-        }
+    if let Some(parent) = path.parent()
+        && let Ok(dir) = std::fs::File::open(parent)
+    {
+        let _ = dir.sync_all();
     }
     Ok(())
 }
