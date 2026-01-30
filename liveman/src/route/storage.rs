@@ -27,7 +27,27 @@ struct PresignResponse {
 }
 
 pub fn route() -> Router<AppState> {
-    Router::new().route("/api/storage/presign", post(presign))
+    Router::new()
+        .route("/api/storage/presign", post(presign))
+        .route("/api/storage/ping", axum::routing::get(ping))
+}
+
+async fn ping(State(state): State<AppState>) -> Result<Response> {
+    #[cfg(feature = "recorder")]
+    {
+        if state.file_storage.is_some() {
+            return Ok((StatusCode::OK, "ok").into_response());
+        }
+        return Ok((StatusCode::SERVICE_UNAVAILABLE, "storage not configured").into_response());
+    }
+
+    #[cfg(not(feature = "recorder"))]
+    {
+        let _ = state;
+        Err(AppError::InternalServerError(anyhow::anyhow!(
+            "feature recorder not enabled",
+        )))
+    }
 }
 
 async fn presign(

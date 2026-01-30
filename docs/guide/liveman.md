@@ -40,6 +40,11 @@ connect_timeout = 30
 
 The recording system stores the index (date-based manifest location) in the database while keeping the actual media files in S3 storage.
 
+Liveman also provides a presign API for Liveion async uploads:
+
+- `POST /api/storage/presign` with `{ "method": "PUT", "path": "object", "ttl_seconds": 300 }`
+- `GET /api/storage/ping` for availability checks
+
 ### Recording Index Schema
 
 Table: `recordings` (auto-created by migrations)

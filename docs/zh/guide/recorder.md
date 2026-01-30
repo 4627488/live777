@@ -139,6 +139,15 @@ enable_virtual_host_style = false
   - 响应: `{ "recording": true }`
 - 停止录制: `DELETE` `/api/record/:streamId`
 
+### 录制索引同步 API
+
+- 拉取会话：`POST` `/api/recordings`
+  - 请求体：`{ "stream": "optional", "since_ts": 0, "limit": 200 }`
+- ACK 会话：`POST` `/api/recordings/ack`
+  - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
+- 删除已 ACK 会话：`POST` `/api/recordings/delete`
+  - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
+
 ## MPD 路径规则 {#mpd}
 
 - 默认 `record_dir`（未显式指定 `base_dir` 时）为 `/:streamId/:record_id/`，其中 `record_id` 是 10 位 Unix 时间戳。
@@ -163,3 +172,19 @@ records/
 ```
 
 - 时间戳目录（如 `stream1/1762842203`）是 Live777 的唯一默认布局，也覆盖了 `max_recording_seconds` 触发的自动轮转。仅在非常明确的场景下才覆盖 `base_dir`，并留意这会让 `record_id` 变成空字符串。
+
+## 异步上传（预签名）
+
+通过 Liveman 预签名接口和本地落盘队列异步上传：
+
+```toml
+[recorder.upload]
+enabled = true
+liveman_url = "http://127.0.0.1:8888"
+liveman_token = "live777"
+queue_path = "./recordings/upload_queue.jsonl"
+local_dir = "./recordings"
+presign_ttl_seconds = 300
+interval_ms = 2000
+concurrency = 2
+```

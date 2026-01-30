@@ -40,6 +40,11 @@ connect_timeout = 30
 
 录制系统在数据库中存储日期索引（manifest 位置），而实际媒体文件保存在 S3 存储中。
 
+Liveman 还提供预签名接口供 Liveion 异步上传：
+
+- `POST /api/storage/presign`：`{ "method": "PUT", "path": "object", "ttl_seconds": 300 }`
+- `GET /api/storage/ping`：可用性探测
+
 ### 录制索引表结构
 
 表名：`recordings`（由迁移自动创建）
