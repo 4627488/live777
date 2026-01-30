@@ -175,9 +175,7 @@ pub async fn start(
         return Ok(existing.info.clone());
     }
     let uploader = { UPLOADER.read().await.clone() };
-    let local_dir = uploader
-        .as_ref()
-        .map(|u| u.local_dir());
+    let local_dir = uploader.as_ref().map(|u| u.local_dir());
     let task = RecordingTask::spawn(manager, &stream, base_dir, uploader, local_dir).await?;
     let info = task.info.clone();
     map.insert(stream.clone(), task);

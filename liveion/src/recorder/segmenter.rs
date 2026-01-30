@@ -872,11 +872,7 @@ impl Segmenter {
                     .enqueue(path_clone.clone(), local_path.to_string_lossy().to_string())
                     .await
                 {
-                    tracing::warn!(
-                        "[segmenter] failed to enqueue upload {}: {}",
-                        path_clone,
-                        e
-                    );
+                    tracing::warn!("[segmenter] failed to enqueue upload {}: {}", path_clone, e);
                 }
             });
         } else {
