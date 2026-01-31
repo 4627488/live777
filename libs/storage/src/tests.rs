@@ -36,24 +36,18 @@ fn test_storage_config_serialization() {
     let deserialized: StorageConfig =
         toml::from_str(&serialized).expect("Failed to deserialize config");
 
-    match (&config, &deserialized) {
-        (StorageConfig::S3 { bucket: b1, .. }, StorageConfig::S3 { bucket: b2, .. }) => {
-            assert_eq!(b1, b2, "Bucket names should match");
-        }
-        _ => panic!("Storage config type mismatch"),
-    }
+    let StorageConfig::S3 { bucket: b1, .. } = &config;
+    let StorageConfig::S3 { bucket: b2, .. } = &deserialized;
+    assert_eq!(b1, b2, "Bucket names should match");
 }
 
 #[test]
 fn test_default_storage_config() {
     let config = StorageConfig::default();
 
-    match config {
-        StorageConfig::S3 { bucket, root, .. } => {
-            assert_eq!(bucket, "");
-            assert_eq!(root, "/");
-        }
-    }
+    let StorageConfig::S3 { bucket, root, .. } = config;
+    assert_eq!(bucket, "");
+    assert_eq!(root, "/");
 }
 
 #[test]
@@ -70,19 +64,15 @@ enable_virtual_host_style = true
 
     let config: StorageConfig = toml::from_str(toml_str).expect("Failed to parse TOML config");
 
-    match config {
-        StorageConfig::S3 {
-            bucket,
-            root,
-            region,
-            enable_virtual_host_style,
-            ..
-        } => {
-            assert_eq!(bucket, "test-bucket");
-            assert_eq!(root, "/recordings");
-            assert_eq!(region, Some("us-east-1".to_string()));
-            assert!(enable_virtual_host_style);
-        }
-        _ => panic!("Expected S3 storage config"),
-    }
+    let StorageConfig::S3 {
+        bucket,
+        root,
+        region,
+        enable_virtual_host_style,
+        ..
+    } = config;
+    assert_eq!(bucket, "test-bucket");
+    assert_eq!(root, "/recordings");
+    assert_eq!(region, Some("us-east-1".to_string()));
+    assert!(enable_virtual_host_style);
 }
