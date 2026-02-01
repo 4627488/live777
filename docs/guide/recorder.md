@@ -141,11 +141,11 @@ Requires `recorder` feature.
 
 ### Recording Index Sync APIs
 
-- Pull sessions: `POST` `/api/recordings`
-  - Body: `{ "stream": "optional", "since_ts": 0, "limit": 200 }`
-- ACK sessions: `POST` `/api/recordings/ack`
+- Pull sessions: `GET` `/api/recordings`
+  - Query: `?stream=optional&since_ts=0&limit=200`
+- ACK sessions: `PATCH` `/api/recordings`
   - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
-- Delete ACKed sessions: `POST` `/api/recordings/delete`
+- Delete ACKed sessions: `DELETE` `/api/recordings`
   - Body: `{ "records": [{ "stream": "s", "record": "id" }] }`
 
 ## MPD Path Conventions {#mpd}

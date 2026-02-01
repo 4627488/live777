@@ -1,6 +1,6 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::Response;
-use axum::routing::post;
+use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 
 #[cfg(feature = "recorder")]
@@ -15,9 +15,12 @@ pub fn route() -> Router<AppState> {
             &api::path::record("{stream}"),
             post(record_stream).get(record_status).delete(stop_record),
         )
-        .route(api::path::recordings(), post(pull_recordings))
-        .route(api::path::recordings_ack(), post(ack_recordings))
-        .route(api::path::recordings_delete(), post(delete_recordings))
+        .route(
+            api::path::recordings(),
+            get(pull_recordings)
+                .patch(ack_recordings)
+                .delete(delete_recordings),
+        )
 }
 #[cfg(feature = "recorder")]
 async fn record_stream(
@@ -101,7 +104,7 @@ async fn stop_record(
 
 #[cfg(feature = "recorder")]
 async fn pull_recordings(
-    Json(req): Json<api::recorder::PullRecordingsRequest>,
+    Query(req): Query<api::recorder::PullRecordingsRequest>,
 ) -> crate::result::Result<Json<api::recorder::PullRecordingsResponse>> {
     let resp = crate::recorder::pull_recordings(req).await?;
     Ok(Json(resp))
@@ -109,7 +112,7 @@ async fn pull_recordings(
 
 #[cfg(not(feature = "recorder"))]
 async fn pull_recordings(
-    Json(_req): Json<api::recorder::PullRecordingsRequest>,
+    Query(_req): Query<api::recorder::PullRecordingsRequest>,
 ) -> crate::result::Result<Json<api::recorder::PullRecordingsResponse>> {
     Err(AppError::Throw("feature recorder not enabled".into()))
 }

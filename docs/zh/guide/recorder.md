@@ -141,11 +141,11 @@ enable_virtual_host_style = false
 
 ### 录制索引同步 API
 
-- 拉取会话：`POST` `/api/recordings`
-  - 请求体：`{ "stream": "optional", "since_ts": 0, "limit": 200 }`
-- ACK 会话：`POST` `/api/recordings/ack`
+- 拉取会话：`GET` `/api/recordings`
+  - Query：`?stream=optional&since_ts=0&limit=200`
+- ACK 会话：`PATCH` `/api/recordings`
   - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
-- 删除已 ACK 会话：`POST` `/api/recordings/delete`
+- 删除已 ACK 会话：`DELETE` `/api/recordings`
   - 请求体：`{ "records": [{ "stream": "s", "record": "id" }] }`
 
 ## MPD 路径规则 {#mpd}

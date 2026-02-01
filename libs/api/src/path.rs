@@ -47,9 +47,9 @@ pub fn recordings() -> &'static str {
 }
 
 pub fn recordings_ack() -> &'static str {
-    "/api/recordings/ack"
+    "/api/recordings"
 }
 
 pub fn recordings_delete() -> &'static str {
-    "/api/recordings/delete"
+    "/api/recordings"
 }

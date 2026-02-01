@@ -307,9 +307,9 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
         let url = format!("{}{}", server.url, api::path::recordings());
         let resp = match state
             .client
-            .post(url)
+            .get(url)
             .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
-            .json(&req)
+            .query(&req)
             .send()
             .await
         {
@@ -391,7 +391,7 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
             };
             match state
                 .client
-                .post(ack_url)
+                .patch(ack_url)
                 .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
                 .json(&ack_req)
                 .send()
@@ -419,7 +419,7 @@ async fn do_record_sync(mut state: AppState) -> Result<()> {
                 };
                 match state
                     .client
-                    .post(delete_url)
+                    .delete(delete_url)
                     .header(header::AUTHORIZATION, format!("Bearer {}", server.token))
                     .json(&delete_req)
                     .send()
