@@ -67,7 +67,7 @@ webrtc = { git = "https://github.com/webrtc-rs/webrtc", rev = "4da5280" }
 sdp = { git = "https://github.com/webrtc-rs/webrtc", rev = "4da5280" }
 
 axum = "0.8"
-axum-extra = "0.10"
+axum-extra = "0.12"
 tower-http = "0.6"
 rust-embed = "8.7"
 mime_guess = "2.0"
@@ -112,7 +112,7 @@ tokio = { workspace = true, features = ["process"] }
 tracing = { workspace = true }
 serde = { workspace = true }
 
-toml = "0.9"
+toml = "1.0"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [features]

@@ -15,7 +15,7 @@ serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true }
 
 # OpenDAL for unified storage access
-opendal = { version = "0.54.0", features = [
+opendal = { version = "0.55.0", features = [
     "services-fs",
     "services-s3",
     "services-oss",
@@ -25,5 +25,5 @@ opendal = { version = "0.54.0", features = [
 chrono = "0.4"
 
 [dev-dependencies]
-toml = "0.9"
+toml = "1.0"
 tokio = { workspace = true, features = ["rt", "macros"] }
