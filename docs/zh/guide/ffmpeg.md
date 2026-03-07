@@ -65,10 +65,25 @@ whipinto -i input.sdp -w http://localhost:7777/whip/777
 
 ```bash
 ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx264 \
+-preset ultrafast -tune zerolatency \
 -profile:v baseline -level 3.0 -pix_fmt yuv420p \
 -g 30 -keyint_min 30 -b:v 1000k \
 -minrate 1000k -maxrate 1000k -bufsize 1000k \
+-f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
+```
+
+```bash
+whipinto -i input.sdp -w http://localhost:7777/whip/777
+```
+
+## Video: H265
+
+```bash
+ffmpeg -re -f lavfi -i testsrc=size=640x480:rate=30 -vcodec libx265 \
 -preset ultrafast -tune zerolatency \
+-x265-params keyint=30:min-keyint=30:bframes=0:repeat-headers=1 \
+-pix_fmt yuv420p \
+-b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 1000k
 -f rtp 'rtp://127.0.0.1:5002' -sdp_file input.sdp
 ```
 
