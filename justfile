@@ -1,7 +1,9 @@
 #!/usr/bin/env -S just --justfile
 
 host := "127.0.0.1"
-server := "http://" + host + ":7777"
+port := "7777"
+server := "http://" + host + ":" + port
+stream := "test-stream"
 
 isdp := "i.sdp"
 osdp := "o.sdp"
@@ -32,70 +34,69 @@ run-cluster:
 
 [group('simple-rtp')]
 mpeg-rtp-h264:
-    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/test-rtp --command \
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtp 'rtp://{{host}}:5002' -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 mpeg-rtp-h265:
-    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/test-rtp --command \
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h265}} -f rtp 'rtp://{{host}}:5002' -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 mpeg-rtp-vp8:
-    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/test-rtp --command \
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec libvpx -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 # 4K (3840×2160)
 [group('simple-rtp')]
 mpeg-rtp-4k:
-    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/test-rtp --command \
+    cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re -f lavfi -i testsrc=size=3840x2160:rate=30 -strict experimental -vcodec {{vp9}} -f rtp rtp://{{host}}:5002 -sdp_file {{isdp}}"
 
 [group('simple-rtp')]
 play-rtp:
-    cargo run --bin=whepfrom -- -o "rtp://localhost?video=9000&audio=9002" --sdp-file {{osdp}} -w {{server}}/whep/test-rtp --command \
+    cargo run --bin=whepfrom -- -o "rtp://localhost?video=9000&audio=9002" --sdp-file {{osdp}} -w {{server}}/whep/{{stream}} --command \
         "ffplay -protocol_whitelist rtp,file,udp -i {{osdp}}"
 
 
 # Aa rtsp server receive stream
 [group('simple-rtsp')]
 mpeg-rtsp:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vcodec libvpx -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
 mpeg-rtsp-tcp:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -vcodec libvpx -rtsp_transport tcp -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
 mpeg-rtsp-vp9:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{asrc}} {{vsrc}} -acodec libopus -strict experimental -vcodec {{vp9}} -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
 mpeg-rtsp-h264:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtsp rtsp://{{host}}:8550"
 
-[group('simple-rtsp')]
 mpeg-rtsp-h264-raw:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec libx264 -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
 mpeg-rtsp-h265:
-    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/test-rtsp --command \
+    cargo run --bin=whipinto -- -i rtsp-listen://{{host}}:8550 -w {{server}}/whip/{{stream}} --command \
         "ffmpeg -re {{vsrc}} -vcodec {{h265}} -f rtsp rtsp://{{host}}:8550"
 
 [group('simple-rtsp')]
 play-rtsp:
-    cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/test-rtsp --command \
+    cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/{{stream}} --command \
         "ffplay rtsp://{{host}}:8650"
 
 [group('simple-rtsp')]
 play-rtsp-tcp:
-    cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/test-rtsp --command \
+    cargo run --bin=whepfrom -- -o rtsp-listen://{{host}}:8650 -w {{server}}/whep/{{stream}} --command \
         "ffplay rtsp://{{host}}:8650 -rtsp_transport tcp"
 
 
