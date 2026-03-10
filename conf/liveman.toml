@@ -110,7 +110,7 @@ connect_timeout = 30
 # Storage type: "fs" for local filesystem; also supports "oss" (Alibaba Cloud OSS) and "s3"
 type = "fs"
 # Root path for local filesystem
-root = "./records"
+root = "./storage"
 
 # Example: Alibaba Cloud OSS storage
 # type = "oss"
