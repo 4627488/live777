@@ -32,6 +32,9 @@ run:
 run-cluster:
     cargo run --bin=livenil --features=webui -- -c conf/livenil
 
+only-mpeg-rtp-h264:
+    ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtp 'rtp://{{host}}:5002?pkt_size=1200' -sdp_file {{isdp}}
+
 [group('simple-rtp')]
 mpeg-rtp-h264:
     cargo run --bin=whipinto -- -i {{isdp}} -w {{server}}/whip/{{stream}} --command \

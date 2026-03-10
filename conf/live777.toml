@@ -12,6 +12,18 @@ urls = [
     "stun:stun.l.google.com:19302",
 ]
 
+[stream]
+
+# Need enabled `--features=source`
+[[stream.sources]]
+# stream_id = "test-source"
+# Need enabled `--features=source-sdp`
+# - SDP file: file:///path/to/file.sdp or /path/to/file.sdp
+# url = "file:///path/to/file.sdp"
+# Need enabled `--features=source-rtsp`
+# - RTSP: rtsp://username:password@host:port/path
+# url = "rtsp://username:password@host:port/path"
+
 [recorder]
 # Stream name patterns for auto-recording, supports wildcards
 # auto_streams = ["*"] # Record all streams

@@ -31,7 +31,7 @@ pub struct Config {
     pub recorder: RecorderConfig,
 
     #[serde(default)]
-    pub sources: SourcesConfig,
+    pub stream: StreamConfig,
 }
 
 #[cfg(feature = "net4mqtt")]
@@ -129,7 +129,7 @@ impl Config {
         }
 
         #[cfg(feature = "source")]
-        for source in &self.sources.sources {
+        for source in &self.stream.sources {
             source
                 .validate()
                 .map_err(|e| anyhow::anyhow!("source config error: {}", e))?;
@@ -180,7 +180,7 @@ impl Default for RecorderConfig {
     }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SourcesConfig {
+pub struct StreamConfig {
     #[serde(default)]
     pub sources: Vec<SourceConfig>,
 }

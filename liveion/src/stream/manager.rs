@@ -493,7 +493,7 @@ impl Manager {
     #[cfg(feature = "source")]
     pub async fn auto_start_sources(
         &self,
-        sources_config: &crate::config::SourcesConfig,
+        sources_config: &crate::config::StreamConfig,
     ) -> Result<()> {
         if sources_config.sources.is_empty() {
             tracing::info!("No sources configured, skipping auto-start");
