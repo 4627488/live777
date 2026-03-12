@@ -23,6 +23,15 @@ build:
     pnpm run build
     cargo build --release --all-targets --all-features
 
+# MacOS:
+#   brew install gstreamer
+# Debian:
+#   apt install libgstreamer1.0-dev libgstrtspserver-1.0-dev
+#
+# Build some tools: test-rtsp-server
+build-tools:
+    gcc -o test-rtsp-server tools/test-rtsp-server.c $(pkg-config --cflags --libs gstreamer-1.0 gstreamer-rtsp-server-1.0)
+
 docs:
     pnpm run docs:dev
 
@@ -34,6 +43,42 @@ run-cluster:
 
 only-mpeg-rtp-h264:
     ffmpeg -re {{vsrc}} -vcodec {{h264}} -f rtp 'rtp://{{host}}:5002?pkt_size=1200' -sdp_file {{isdp}}
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-h264:
+    ./test-rtsp-server "( videotestsrc is-live=true ! x264enc ! rtph264pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-h265:
+    ./test-rtsp-server "( videotestsrc is-live=true ! x265enc ! rtph265pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-vp8:
+    ./test-rtsp-server "( videotestsrc is-live=true ! vp8enc ! rtpvp8pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-vp9:
+    ./test-rtsp-server "( videotestsrc is-live=true ! vp9enc ! rtpvp9pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-av1:
+    ./test-rtsp-server "( videotestsrc is-live=true ! av1enc usage-profile=realtime ! av1parse ! rtpav1pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-opus:
+    ./test-rtsp-server "( audiotestsrc is-live=true ! opusenc ! rtpopuspay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-g722:
+    ./test-rtsp-server "( audiotestsrc is-live=true ! avenc_g722 ! rtpg722pay name=pay0 pt=96 )"
+
+[group('gst-rtsp-server')]
+gst-rtsp-server-both-h264-opus:
+    ./test-rtsp-server "( videotestsrc is-live=true ! x264enc ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! opusenc ! rtpopuspay name=pay1 pt=97 )"
+
+[group('gst-rtsp-server')]
+whip-rtsp:
+    cargo run --bin=whipinto -- -i rtsp://{{host}}:8554/test -w {{server}}/whip/{{stream}}
 
 [group('simple-rtp')]
 mpeg-rtp-h264:
