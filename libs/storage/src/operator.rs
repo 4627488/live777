@@ -8,6 +8,11 @@ pub fn create_operator(config: &StorageConfig) -> Result<Operator> {
     tracing::debug!("Creating storage operator for config: {:?}", config);
 
     match config {
+        StorageConfig::Fs { root } => {
+            tracing::info!("Configuring local filesystem storage with root: {}", root);
+            let builder = services::Fs::default().root(root);
+            Ok(Operator::new(builder)?.finish())
+        }
         StorageConfig::S3 {
             bucket,
             root,

@@ -1,6 +1,28 @@
 use crate::{StorageConfig, create_operator};
 
 #[tokio::test]
+async fn test_fs_storage_config() {
+    let config = StorageConfig::Fs {
+        root: std::env::temp_dir().to_string_lossy().into_owned(),
+    };
+    let result = create_operator(&config);
+    assert!(result.is_ok(), "Failed to create fs storage operator");
+}
+
+#[test]
+fn test_fs_config_parsing() {
+    let toml_str = r#"
+type = "fs"
+root = "./storage"
+"#;
+    let config: StorageConfig = toml::from_str(toml_str).expect("Failed to parse TOML config");
+    let StorageConfig::Fs { root } = config else {
+        panic!("Expected Fs variant");
+    };
+    assert_eq!(root, "./storage");
+}
+
+#[tokio::test]
 async fn test_s3_storage_config() {
     let config = StorageConfig::S3 {
         bucket: "test-bucket".to_string(),
@@ -36,18 +58,22 @@ fn test_storage_config_serialization() {
     let deserialized: StorageConfig =
         toml::from_str(&serialized).expect("Failed to deserialize config");
 
-    let StorageConfig::S3 { bucket: b1, .. } = &config;
-    let StorageConfig::S3 { bucket: b2, .. } = &deserialized;
+    let StorageConfig::S3 { bucket: b1, .. } = &config else {
+        panic!("Expected S3 variant");
+    };
+    let StorageConfig::S3 { bucket: b2, .. } = &deserialized else {
+        panic!("Expected S3 variant");
+    };
     assert_eq!(b1, b2, "Bucket names should match");
 }
 
 #[test]
 fn test_default_storage_config() {
     let config = StorageConfig::default();
-
-    let StorageConfig::S3 { bucket, root, .. } = config;
-    assert_eq!(bucket, "");
-    assert_eq!(root, "/");
+    let StorageConfig::Fs { root } = config else {
+        panic!("Default config should be Fs variant");
+    };
+    assert_eq!(root, "./storage");
 }
 
 #[test]
@@ -70,7 +96,10 @@ enable_virtual_host_style = true
         region,
         enable_virtual_host_style,
         ..
-    } = config;
+    } = config
+    else {
+        panic!("Expected S3 variant");
+    };
     assert_eq!(bucket, "test-bucket");
     assert_eq!(root, "/recordings");
     assert_eq!(region, Some("us-east-1".to_string()));

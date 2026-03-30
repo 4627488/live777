@@ -107,13 +107,15 @@ connect_timeout = 30
 [recorder]
 
 [recorder.storage]
-# Storage type: "s3" only
-type = "s3"
-bucket = "my-live777-bucket"
-root = "/recordings"
-region = "us-east-1"
+# Local filesystem (default). Note: presign endpoint requires S3.
+type = "fs"
+root = "./storage"
 
-# Optional: explicit credentials
+# AWS S3 with explicit credentials
+# type = "s3"
+# bucket = "my-live777-bucket"
+# root = "/recordings"
+# region = "us-east-1"
 # access_key_id = "your-access-key"
 # secret_access_key = "your-access-secret"
 

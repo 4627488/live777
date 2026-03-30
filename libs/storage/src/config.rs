@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
 
-/// Unified storage configuration for Live777 components (S3-only)
+/// Unified storage configuration for Live777 components
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum StorageConfig {
+    /// Local filesystem storage (basic maintenance; no presign support)
+    Fs {
+        /// Root directory for storing recordings
+        root: String,
+    },
     /// AWS S3 compatible storage
     S3 {
         /// S3 bucket name
@@ -37,16 +42,8 @@ pub enum StorageConfig {
 
 impl Default for StorageConfig {
     fn default() -> Self {
-        Self::S3 {
-            bucket: String::new(),
-            root: default_s3_root(),
-            region: None,
-            endpoint: None,
-            access_key_id: None,
-            secret_access_key: None,
-            session_token: None,
-            disable_config_load: false,
-            enable_virtual_host_style: false,
+        Self::Fs {
+            root: "./storage".to_string(),
         }
     }
 }
