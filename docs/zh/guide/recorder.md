@@ -1,6 +1,6 @@
 # Recorder
 
-liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到 S3 存储。需要在编译时启用 `recorder` 特性。
+liveion 的 Recorder 是一个可选功能，用于将实时流自动录制为 MP4 分片并保存到存储。需要在编译时启用 `recorder` 特性。
 
 ## 目前支持的编码 {#codec}
 
@@ -46,12 +46,10 @@ max_recording_seconds = 86_400
 # 可选：多节点部署的节点别名
 node_alias = "live777-node-001"
 
-# 存储后端配置（仅 S3）
+# 存储后端配置（默认：本地文件系统）
 [recorder.storage]
-type = "s3"        # 存储类型仅支持 "s3"
-bucket = "my-live777-bucket"
-root = "/recordings"
-region = "us-east-1"
+type = "fs"
+root = "./storage"
 ```
 
 ### 配置选项
@@ -62,11 +60,20 @@ region = "us-east-1"
 - `max_recording_seconds`: 单个录制会话的最大持续时间（秒），超过即重新开一个录制（默认：`86400`，设为 `0` 禁用自动轮转）
 - `node_alias`: 可选的节点标识符，用于多节点部署（默认：不设置）
 
-#### 存储选项（仅 S3）
+#### 存储选项
+
+**本地文件系统后端（默认）：**
+
+- `type`: `"fs"`
+- `root`: 存储录制文件的根目录（默认：`"./storage"`）
+
+::: warning
+本地文件系统后端仅支持基本录制功能。[异步上传队列](#async-upload)功能需要 S3 存储。
+:::
 
 **S3 后端：**
 
-- `type`: 必须为 `"s3"`
+- `type`: `"s3"`
 - `bucket`: S3 存储桶名称（必需）
 - `root`: 存储桶内的根路径（默认：`"/"`）
 - `region`: AWS 区域（可选，未设置时从环境自动检测）
@@ -77,7 +84,19 @@ region = "us-east-1"
 - `disable_config_load`: 设为 `true` 禁用从环境/配置文件自动加载凭证（默认：`false`）
 - `enable_virtual_host_style`: 启用虚拟主机样式请求，如 `bucket.endpoint.com` 而非 `endpoint.com/bucket`（默认：`false`）
 
-## 存储后端（仅 S3） {#storage}
+## 存储后端 {#storage}
+
+### 本地文件系统（默认）
+
+```toml
+[recorder.storage]
+type = "fs"
+root = "./storage"
+```
+
+::: info
+本地文件系统后端支持基本录制（写入分片、更新 MPD）。不支持预签名 URL 和异步上传队列。
+:::
 
 ### AWS S3
 
@@ -153,14 +172,14 @@ enable_virtual_host_style = false
 - 默认 `record_dir`（未显式指定 `base_dir` 时）为 `/:streamId/:record_id/`，其中 `record_id` 是 10 位 Unix 时间戳。
 - 默认 MPD 位置： `/{record_dir}/manifest.mpd`。
 - 当单个录制会话累计时长达到 `max_recording_seconds` 时，Recorder 会关闭当前片段并以新的时间戳目录（如 `/:streamId/1718200000/`）继续录制，系统不会自动生成日历路径。
-- 当提供 `base_dir` 时，`record_dir` 与该值完全一致，Manifest 位于 `/{record_dir}/manifest.mpd`。若该值未以 10 位 Unix 时间戳结尾，响应中的 `record_id` 会是空字符串。
+- 当提供 `base_dir` 时，`record_dir` 与该值完全一致，Manifest 位于 `/{base_dir}/manifest.mpd`。若该值未以 10 位 Unix 时间戳结尾，响应中的 `record_id` 会是空字符串。
 
 ## 文件组织结构 {#file-structure}
 
 录制文件会根据 `record_dir` 组织：
 
 ```
-records/
+storage/
 └── stream1/
     └── 1762842203/
         ├── manifest.mpd
@@ -173,7 +192,11 @@ records/
 
 - 时间戳目录（如 `stream1/1762842203`）是 Live777 的唯一默认布局，也覆盖了 `max_recording_seconds` 触发的自动轮转。仅在非常明确的场景下才覆盖 `base_dir`，并留意这会让 `record_id` 变成空字符串。
 
-## 异步上传（预签名）
+## 异步上传（预签名） {#async-upload}
+
+::: warning
+异步上传需要 S3 存储，本地文件系统后端不支持此功能。
+:::
 
 通过 Liveman 预签名接口和本地落盘队列异步上传：
 
