@@ -1,6 +1,6 @@
 use axum::extract::{Path, Query, State};
 use axum::response::Response;
-use axum::routing::{delete, get, patch, post};
+use axum::routing::{get, post};
 use axum::{Json, Router};
 
 #[cfg(feature = "recorder")]
