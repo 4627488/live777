@@ -1527,6 +1527,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "795cbfc56d419a7ce47ccbb7504dd9a5b7c484c083c356e797de08bd988d9629"
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "funty"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2452,6 +2462,8 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "api",
+ "axum 0.8.8",
+ "axum-extra",
  "clap",
  "cli",
  "http 1.4.0",
@@ -2460,6 +2472,7 @@ dependencies = [
  "liveman",
  "livetwo",
  "net4mqtt",
+ "opendal",
  "reqwest",
  "serde",
  "serde_json",
@@ -2521,6 +2534,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "fs2",
  "glob",
  "h264-reader",
  "http 1.4.0",
@@ -3808,7 +3822,6 @@ dependencies = [
  "home",
  "http 1.4.0",
  "log",
- "once_cell",
  "percent-encoding",
  "quick-xml 0.37.5",
  "rand 0.8.5",
