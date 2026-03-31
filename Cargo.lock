@@ -2472,7 +2472,7 @@ dependencies = [
  "liveman",
  "livetwo",
  "net4mqtt",
- "opendal 0.54.1",
+ "opendal",
  "reqwest",
  "serde",
  "serde_json",
@@ -2548,7 +2548,7 @@ dependencies = [
  "mime_guess",
  "net4mqtt",
  "once_cell",
- "opendal 0.55.0",
+ "opendal",
  "prometheus",
  "rand 0.10.0",
  "reqwest",
@@ -2587,7 +2587,7 @@ dependencies = [
  "iceserver",
  "mime_guess",
  "net4mqtt",
- "opendal 0.55.0",
+ "opendal",
  "reqwest",
  "rust-embed",
  "sea-orm",
@@ -3002,32 +3002,6 @@ name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
-
-[[package]]
-name = "opendal"
-version = "0.54.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42afda58fa2cf50914402d132cc1caacff116a85d10c72ab2082bb7c50021754"
-dependencies = [
- "anyhow",
- "backon",
- "base64 0.22.1",
- "bytes",
- "chrono",
- "futures",
- "getrandom 0.2.17",
- "http 1.4.0",
- "http-body 1.0.1",
- "log",
- "md-5",
- "percent-encoding",
- "quick-xml 0.38.4",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
 
 [[package]]
 name = "opendal"
@@ -5227,7 +5201,7 @@ version = "0.8.1"
 dependencies = [
  "anyhow",
  "chrono",
- "opendal 0.55.0",
+ "opendal",
  "serde",
  "tokio",
  "toml 1.0.6+spec-1.1.0",

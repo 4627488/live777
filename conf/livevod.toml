@@ -11,16 +11,25 @@
 # Playback index path (JSONL or JSON array)
 index_path = "./recordings/index.json"
 
-# Storage backend configuration (S3-only)
+# Storage backend configuration
 [storage]
-type = "s3"
-bucket = "my-live777-bucket"
-root = "/recordings"
-region = "us-east-1"
+# Local filesystem (default)
+type = "fs"
+root = "./recordings"
 
-# Optional: explicit credentials
+# AWS S3 with explicit credentials
+#type = "s3"
+#bucket = "my-live777-bucket"
+#root = "/recordings"
+#region = "us-east-1"
 #access_key_id = "AKIAIOSFODNN7EXAMPLE"
 #secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# AWS S3 with IAM role (recommended for EC2/ECS)
+#type = "s3"
+#bucket = "my-live777-bucket"
+#root = "/recordings"
+#region = "us-east-1"
 
 # Optional: custom endpoint for S3-compatible storage
 #endpoint = "http://localhost:9000"
