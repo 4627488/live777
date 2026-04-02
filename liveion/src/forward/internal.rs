@@ -31,7 +31,7 @@ use webrtc::track::track_remote::TrackRemote;
 
 use crate::AppError;
 use crate::forward::get_peer_id;
-use crate::forward::message::ForwardInfo;
+use crate::forward::message::{ForwardInfo, SessionInfo};
 use crate::forward::rtcp::RtcpMessage;
 use crate::result::Result;
 use crate::{metrics, new_broadcast_channel};
@@ -98,25 +98,46 @@ impl PeerForwardInternal {
             subscribe_session_infos.push(subscribe.info().await);
         }
 
+        let publish_tracks = self.publish_tracks.read().await;
+
+        #[cfg(feature = "source")]
+        let has_virtual_publisher = publish_tracks
+            .iter()
+            .any(|track| matches!(track, PublishTrackRemote::Virtual(_)));
+
+        #[cfg(not(feature = "source"))]
+        let has_virtual_publisher = false;
+
+        let publish_session_info = self
+            .publish
+            .read()
+            .await
+            .as_ref()
+            .map(|publish| publish.info());
+
+        let effective_publish_session_info = if publish_session_info.is_none()
+            && has_virtual_publisher
+        {
+            Some(SessionInfo {
+            id: "virtual-source".to_string(),
+            create_at: self.create_at,
+            state: webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState::Connected,
+            cascade: None,
+            has_data_channel: false,
+        })
+        } else {
+            publish_session_info
+        };
+
         ForwardInfo {
             id: self.stream.clone(),
             create_at: self.create_at,
             publish_leave_at: *self.publish_leave_at.read().await,
             subscribe_leave_at: *self.subscribe_leave_at.read().await,
-            publish_session_info: self
-                .publish
-                .read()
-                .await
-                .as_ref()
-                .map(|publish| publish.info()),
+            publish_session_info: effective_publish_session_info,
             subscribe_session_infos,
-            codecs: self
-                .publish_tracks
-                .read()
-                .await
-                .iter()
-                .map(|track| track.codec())
-                .collect(),
+            codecs: publish_tracks.iter().map(|track| track.codec()).collect(),
+            has_virtual_publisher,
         }
     }
 
